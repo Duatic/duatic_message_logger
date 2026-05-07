@@ -93,6 +93,19 @@ See [fmt](https://github.com/fmtlib/fmt) for all formatting options
   logging::fatal(logger, "Fatal {}", 1);
 ```
 
+## 5. Old MELO style api
+
+Do not use this - this is for compatibility only
+
+```c++
+#include "duatic_message_logger/message_logger.hpp"
+
+...
+
+MELO_INFO("{}", 1);
+MELO_INFO_STREAM("ABC" << 1);
+```
+
 # Contributing
 
 Please see the [Contributing guide](./CONTRIBUTING.md)

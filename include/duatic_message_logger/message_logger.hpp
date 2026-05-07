@@ -26,3 +26,24 @@
 #include "duatic_message_logger/logging.hpp"
 
 // Wrapper to provide the old MELO_LOG style api
+// See https://github.com/leggedrobotics/message_logger
+
+// NOTE we only implement a subset of the API but the most commonly used one
+
+namespace duatic::message_logger
+{
+#define MELO_DEBUG(...) duatic::message_logger::debug(__VA_ARGS__)
+#define MELO_DEBUG_STREAM(message) (duatic::message_logger::debug() << message)
+
+#define MELO_INFO(...) duatic::message_logger::info(__VA_ARGS__)
+#define MELO_INFO_STREAM(message) (duatic::message_logger::info() << message)
+
+#define MELO_WARN(...) duatic::message_logger::warning(__VA_ARGS__)
+#define MELO_WARN_STREAM(message) (duatic::message_logger::warning() << message)
+
+#define MELO_ERROR(...) duatic::message_logger::error(__VA_ARGS__)
+#define MELO_ERROR_STREAM(message) (duatic::message_logger::error() << message)
+
+#define MELO_FATAL(...) duatic::message_logger::error(__VA_ARGS__)
+#define MELO_FATAL_STREAM(message) (duatic::message_logger::error() << message)
+}  // namespace duatic::message_logger

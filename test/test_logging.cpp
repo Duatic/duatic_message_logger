@@ -106,3 +106,11 @@ TEST(Logging, Simple)
 {
   logging::info() << "Test" << std::endl;
 }
+
+// Test old melo style api
+#include "duatic_message_logger/message_logger.hpp"
+TEST(Logging, Melo)
+{
+  MELO_INFO("{}", 1);
+  MELO_INFO_STREAM("ABC" << 1);
+}

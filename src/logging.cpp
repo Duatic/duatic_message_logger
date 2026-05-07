@@ -41,6 +41,7 @@ static auto sink_{ std::make_shared<spdlog::sinks::stdout_color_sink_mt>() };
 
 static spdlog::logger logger_{ "global_logger", sink_ };
 
+// Helper functions to convert our own log level into the library used log level
 static constexpr spdlog::level::level_enum convert_level(const LogLevel level)
 {
   switch (level) {

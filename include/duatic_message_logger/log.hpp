@@ -29,4 +29,5 @@
 namespace logging
 {
 using namespace duatic::message_logger;  // NOLINT(build/namespaces)
+
 }
