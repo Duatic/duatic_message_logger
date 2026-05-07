@@ -36,6 +36,8 @@ TEST(Logging, DefaultOutput)
   duatic::message_logger::error() << "Test error";
   duatic::message_logger::fatal() << "Test fatal";
 
+  // Test std::hex
+  duatic::message_logger::info() << "Test hex: 0x" << std::hex << 834;
   // Test fmt style usage
   duatic::message_logger::debug("Debug {}", 1);
   duatic::message_logger::info("Info {}", 1);

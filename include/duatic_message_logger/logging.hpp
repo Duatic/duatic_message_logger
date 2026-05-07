@@ -69,6 +69,11 @@ public:
     manip(oss_);
     return *this;
   }
+  LogStream& operator<<(std::ios_base& (*manip)(std::ios_base&))
+  {
+    manip(oss_);
+    return *this;
+  }
   // Implemented in cpp file to hide direct spdlog reference
   ~LogStream();
 
