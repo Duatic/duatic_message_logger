@@ -19,6 +19,79 @@ All dependencies with their corresponding version are listed in the [repos.list]
 
 # Usage
 
+## 1. global logger streaming api
+
+```c++
+#include "duatic_message_logger/log.hpp"
+
+...
+
+logging::debug() << "Test" << std::endl;
+logging::info() << "Test" << std::endl;
+logging::warning() << "Test" << std::endl;
+logging::error() << "Test" << std::endl;
+logging::fatal() << "Test" << std::endl;
+
+```
+
+## 2. global logger fmt style api
+
+See [fmt](https://github.com/fmtlib/fmt) for all formatting options
+
+```c++
+#include "duatic_message_logger/log.hpp"
+
+...
+
+logging::debug("Debug {}", 1);
+logging::info("Info {}", 1);
+logging::warning("Warning {}", 1);
+logging::error("Error {}", 1);
+logging::fatal("Fatal {}", 1);
+```
+
+## 3. custom logger streaming api
+
+```c++
+#include "duatic_message_logger/log.hpp"
+
+...
+  // Create a custom sink + logger (spdlog style)
+  auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  sink->set_color_mode(spdlog::color_mode::always);
+  sink->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
+  spdlog::logger logger{ "custom", sink };
+
+  // and use it in the streaming style
+  logging::debug(logger) << "Test debug"
+                                        << "test" << std::endl;
+  logging::info(logger) << "Test info";
+  logging::warning(logger) << "Test warning";
+  logging::error(logger) << "Test error";
+  logging::fatal(logger) << "Test fatal";
+```
+
+## 4. custom logger ftm style api
+
+See [fmt](https://github.com/fmtlib/fmt) for all formatting options
+
+```c++
+#include "duatic_message_logger/log.hpp"
+
+...
+  // Create a custom sink + logger (spdlog style)
+  auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  sink->set_color_mode(spdlog::color_mode::always);
+  sink->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
+  spdlog::logger logger{ "custom", sink };
+
+  // and use it in the streaming style
+  logging::debug(logger, "Debug {}", 1);
+  logging::info(logger, "Info {}", 1);
+  logging::warning(logger, "Warning {}", 1);
+  logging::error(logger, "Error {}", 1);
+  logging::fatal(logger, "Fatal {}", 1);
+```
 
 # Contributing
 
