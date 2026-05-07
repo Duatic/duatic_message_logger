@@ -106,6 +106,20 @@ MELO_INFO("{}", 1);
 MELO_INFO_STREAM("ABC" << 1);
 ```
 
+## 6. Explicit namespace
+
+Use this in case the `logging` namespace is too general for you
+
+```c++
+// we include a different header
+#include "duatic_message_logger/logging.hpp"
+
+...
+// call with the full namespace
+duatic::message_logger::debug("Debug {}", 1);
+
+```
+
 # Contributing
 
 Please see the [Contributing guide](./CONTRIBUTING.md)
