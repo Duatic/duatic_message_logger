@@ -67,3 +67,42 @@ TEST(Logging, StandardOut)
   duatic::message_logger::error() << "Test error";
   duatic::message_logger::fatal() << "Test fatal";
 }
+
+TEST(Logging, ExplicitLogger)
+{
+  // Reconfigure to use a different output sink
+  auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  // ROS2-like pattern:
+  // %^   = start color
+  // %l   = log level
+  // %$   = reset color
+  // %n   = logger name (node name)
+  // %v   = message
+  // %Y-%m-%d %H:%M:%S.%f = timestamp with microseconds
+  sink->set_color_mode(spdlog::color_mode::always);
+  sink->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
+  spdlog::logger logger{ "custom", sink };
+
+  // ftm style
+  duatic::message_logger::debug(logger, "Debug {}", 1);
+  duatic::message_logger::info(logger, "Info {}", 1);
+  duatic::message_logger::warning(logger, "Warning {}", 1);
+  duatic::message_logger::error(logger, "Error {}", 1);
+  duatic::message_logger::fatal(logger, "Fatal {}", 1);
+
+  // stream style
+  duatic::message_logger::debug(logger) << "Test debug"
+                                        << "test" << std::endl;
+  duatic::message_logger::info(logger) << "Test info";
+  duatic::message_logger::warning(logger) << "Test warning";
+  duatic::message_logger::error(logger) << "Test error";
+  duatic::message_logger::fatal(logger) << "Test fatal";
+}
+
+// Test the convenience wrapper
+#include "duatic_message_logger/log.hpp"
+
+TEST(Logging, Simple)
+{
+  logging::info() << "Test" << std::endl;
+}

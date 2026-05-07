@@ -34,6 +34,7 @@ namespace duatic::message_logger
 
 using Logger = spdlog::logger;
 
+// We support the same log levels as ROS2
 enum class LogLevel
 {
   Debug,
@@ -45,8 +46,9 @@ enum class LogLevel
 
 namespace impl
 {
-Logger& get_logger();
+Logger& get_default_logger();
 
+// Wrapper around spdlog logger which provide a streaming style api
 class LogStream
 {
 public:
@@ -66,7 +68,7 @@ public:
     manip(oss_);
     return *this;
   }
-
+  // Implemented in cpp file to hide direct spdlog reference
   ~LogStream();
 
 private:
@@ -77,26 +79,32 @@ private:
 
 }  // namespace impl
 
+// fmt style api
 template <typename... Args>
-inline void log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
+inline void log(Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
 {
   switch (level) {
     case LogLevel::Debug:
-      impl::get_logger().debug(fmt, std::forward<Args>(args)...);
+      logger.debug(fmt, std::forward<Args>(args)...);
       break;
     case LogLevel::Info:
-      impl::get_logger().info(fmt, std::forward<Args>(args)...);
+      logger.info(fmt, std::forward<Args>(args)...);
       break;
     case LogLevel::Warning:
-      impl::get_logger().warn(fmt, std::forward<Args>(args)...);
+      logger.warn(fmt, std::forward<Args>(args)...);
       break;
     case LogLevel::Error:
-      impl::get_logger().error(fmt, std::forward<Args>(args)...);
+      logger.error(fmt, std::forward<Args>(args)...);
       break;
     case LogLevel::Fatal:
-      impl::get_logger().critical(fmt, std::forward<Args>(args)...);
+      logger.critical(fmt, std::forward<Args>(args)...);
       break;
   }
+}
+template <typename... Args>
+inline void log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(impl::get_default_logger(), level, fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
@@ -104,11 +112,21 @@ inline void debug(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Debug, fmt, std::forward<Args>(args)...);
 }
+template <typename... Args>
+inline void debug(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(logger, LogLevel::Debug, fmt, std::forward<Args>(args)...);
+}
 
 template <typename... Args>
 inline void info(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Info, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void info(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(logger, LogLevel::Info, fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
@@ -118,9 +136,20 @@ inline void warning(fmt::format_string<Args...> fmt, Args&&... args)
 }
 
 template <typename... Args>
+inline void warning(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(logger, LogLevel::Warning, fmt, std::forward<Args>(args)...);
+}
+
+template <typename... Args>
 inline void error(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Error, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void error(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(logger, LogLevel::Error, fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
@@ -128,32 +157,62 @@ inline void fatal(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
+template <typename... Args>
+inline void fatal(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
+}
 
+// stream style api
 inline impl::LogStream log(LogLevel level)
 {
-  return impl::LogStream(impl::get_logger(), level);
+  return impl::LogStream(impl::get_default_logger(), level);
+}
+inline impl::LogStream log(Logger& logger, LogLevel level)
+{
+  return impl::LogStream(logger, level);
 }
 inline impl::LogStream debug()
 {
   return log(LogLevel::Debug);
+}
+inline impl::LogStream debug(Logger& logger)
+{
+  return log(logger, LogLevel::Debug);
 }
 
 inline impl::LogStream info()
 {
   return log(LogLevel::Info);
 }
+inline impl::LogStream info(Logger& logger)
+{
+  return log(logger, LogLevel::Info);
+}
 
 inline impl::LogStream warning()
 {
   return log(LogLevel::Warning);
 }
+inline impl::LogStream warning(Logger& logger)
+{
+  return log(logger, LogLevel::Warning);
+}
 inline impl::LogStream error()
 {
   return log(LogLevel::Error);
 }
+inline impl::LogStream error(Logger& logger)
+{
+  return log(logger, LogLevel::Error);
+}
 inline impl::LogStream fatal()
 {
   return log(LogLevel::Fatal);
+}
+inline impl::LogStream fatal(Logger& logger)
+{
+  return log(logger, LogLevel::Fatal);
 }
 
 /**
@@ -164,6 +223,6 @@ void configure_logger(Logger& logger);
 /**
  * @brief obtain a named logger
  */
-Logger get_logger(const std::string& name);
+Logger get_default_logger(const std::string& name);
 
 }  // namespace duatic::message_logger

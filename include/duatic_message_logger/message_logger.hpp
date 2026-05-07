@@ -21,63 +21,8 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#pragma once
+
 #include "duatic_message_logger/logging.hpp"
 
-#include "spdlog/sinks/stdout_color_sinks.h"
-
-#ifdef ENABLE_ROS2_LOGGING
-#include "duatic_message_logger/ros2_logger.hpp"
-#endif
-
-namespace duatic::message_logger
-{
-// As soon as rclcpp is found we default to the ros2 logging infrastructure
-// otherwise we use std::cout logging via spdlog
-#ifdef ENABLE_ROS2_LOGGING
-static auto sink_{ std::make_shared<ROS2Sink>(rclcpp::get_logger("default")) };
-#else
-static auto sink_{ std::make_shared<spdlog::sinks::stdout_color_sink_mt>() };
-#endif
-
-static spdlog::logger logger_{ "global_logger", sink_ };
-
-static constexpr spdlog::level::level_enum convert_level(const LogLevel level)
-{
-  switch (level) {
-    case LogLevel::Debug:
-      return spdlog::level::debug;
-    case LogLevel::Info:
-      return spdlog::level::info;
-    case LogLevel::Warning:
-      return spdlog::level::warn;
-    case LogLevel::Error:
-      return spdlog::level::err;
-    case LogLevel::Fatal:
-      return spdlog::level::critical;
-  }
-  return spdlog::level::info;
-}
-
-namespace impl
-{
-Logger& get_default_logger()
-{
-  return logger_;
-}
-
-LogStream::~LogStream()
-{
-  logger_->log(convert_level(level_), oss_.str());
-}
-}  // namespace impl
-
-void configure_logger(Logger& logger)
-{
-  logger_ = logger;
-}
-Logger get_default_logger(const std::string& name)
-{
-  return spdlog::logger(name, sink_);
-}
-
-}  // namespace duatic::message_logger
+// Wrapper to provide the old MELO_LOG style api
