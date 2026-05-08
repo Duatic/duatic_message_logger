@@ -4,6 +4,8 @@ A modern c++20 logging solution which can either log to a ROS2 backend or be use
 [![Humble Build Main](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-humble.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-humble.yml) [![Jazzy Build Main](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-jazzy.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-jazzy.yml)  [![Kilted Build Main](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-kilted.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-kilted.yml)  [![Rolling Build Main](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-rolling.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-rolling.yml)
 
 
+It provide a compat header with the old `MELO` style logging macros.
+
 # License
 
 The contents are licensed under the BSD-3-Clause  [license](LICENSE).\
@@ -95,10 +97,11 @@ See [fmt](https://github.com/fmtlib/fmt) for all formatting options
 
 ## 5. Old MELO style api
 
-Do not use this - this is for compatibility only
+Do not use this - this is for compatibility only.
+The `message_logger` packet is implemented as drop in replacement.
 
 ```c++
-#include "duatic_message_logger/message_logger.hpp"
+#include "message_logger/message_logger.hpp"
 
 ...
 

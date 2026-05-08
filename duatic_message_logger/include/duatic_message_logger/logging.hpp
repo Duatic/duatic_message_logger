@@ -58,7 +58,7 @@ public:
   }
 
   template <typename T>
-  requires(!std::is_function_v<std::remove_pointer_t<T>>) LogStream& operator<<(const T& value)
+  LogStream& operator<<(const T& value)
   {
     oss_ << value;
     return *this;

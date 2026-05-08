@@ -23,27 +23,37 @@
  */
 #pragma once
 
+#include <iomanip>
+
 #include "duatic_message_logger/logging.hpp"
 
 // Wrapper to provide the old MELO_LOG style api
 // See https://github.com/leggedrobotics/message_logger
 
 // NOTE we only implement a subset of the API but the most commonly used one
+// The _throttle_ variants are just redirecting to the other versions
 
-namespace duatic::message_logger
+#define MELO_DEBUG(...) duatic::message_logger::debug(__VA_ARGS__);
+#define MELO_DEBUG_STREAM(message) (duatic::message_logger::debug() << message);
+#define MELO_DEBUG_THROTTLE_STREAM(rate, message) MELO_DEBUG_STREAM(message)
+
+#define MELO_INFO(...) duatic::message_logger::info(__VA_ARGS__);
+#define MELO_INFO_STREAM(message) (duatic::message_logger::info() << message);
+#define MELO_INFO_THROTTLE_STREAM(rate, message) MELO_INFO_STREAM(message)
+
+#define MELO_WARN(...) duatic::message_logger::warning(__VA_ARGS__);
+#define MELO_WARN_STREAM(message) (duatic::message_logger::warning() << message);
+#define MELO_WARN_THROTTLE_STREAM(rate, message) MELO_WARN_STREAM(message)
+
+#define MELO_ERROR(...) duatic::message_logger::error(__VA_ARGS__);
+#define MELO_ERROR_STREAM(message) (duatic::message_logger::error() << message);
+#define MELO_ERROR_THROTTLE_STREAM(rate, message) MELO_ERROR_STREAM(message)
+
+#define MELO_FATAL(...) duatic::message_logger::error(__VA_ARGS__);
+#define MELO_FATAL_STREAM(message) (duatic::message_logger::error() << message);
+#define MELO_FATAL_THROTTLE_STREAM(rate, message) MELO_FATAL_STREAM(message)
+
+namespace message_logger::log::levels
 {
-#define MELO_DEBUG(...) duatic::message_logger::debug(__VA_ARGS__)
-#define MELO_DEBUG_STREAM(message) (duatic::message_logger::debug() << message)
-
-#define MELO_INFO(...) duatic::message_logger::info(__VA_ARGS__)
-#define MELO_INFO_STREAM(message) (duatic::message_logger::info() << message)
-
-#define MELO_WARN(...) duatic::message_logger::warning(__VA_ARGS__)
-#define MELO_WARN_STREAM(message) (duatic::message_logger::warning() << message)
-
-#define MELO_ERROR(...) duatic::message_logger::error(__VA_ARGS__)
-#define MELO_ERROR_STREAM(message) (duatic::message_logger::error() << message)
-
-#define MELO_FATAL(...) duatic::message_logger::error(__VA_ARGS__)
-#define MELO_FATAL_STREAM(message) (duatic::message_logger::error() << message)
-}  // namespace duatic::message_logger
+using Level = duatic::message_logger::LogLevel;
+}
