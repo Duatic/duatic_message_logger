@@ -61,10 +61,6 @@ static constexpr spdlog::level::level_enum convert_level(const LogLevel level)
 
 namespace impl
 {
-Logger& get_default_logger()
-{
-  return logger_;
-}
 
 LogStream::~LogStream()
 {
@@ -76,9 +72,13 @@ void configure_logger(Logger& logger)
 {
   logger_ = logger;
 }
-Logger get_default_logger(const std::string& name)
+Logger get_logger_with_default_sink(const std::string& name)
 {
   return spdlog::logger(name, sink_);
+}
+Logger& get_default_logger()
+{
+  return logger_;
 }
 
 }  // namespace duatic::message_logger

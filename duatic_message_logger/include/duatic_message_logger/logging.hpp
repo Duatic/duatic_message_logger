@@ -45,9 +45,13 @@ enum class LogLevel
   Fatal
 };
 
+/**
+ * @brief obtain the currently configured default logger
+ */
+Logger& get_default_logger();
+
 namespace impl
 {
-Logger& get_default_logger();
 
 // Wrapper around spdlog logger which provide a streaming style api
 class LogStream
@@ -110,7 +114,7 @@ inline void log(Logger& logger, LogLevel level, fmt::format_string<Args...> fmt,
 template <typename... Args>
 inline void log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
 {
-  log(impl::get_default_logger(), level, fmt, std::forward<Args>(args)...);
+  log(get_default_logger(), level, fmt, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
@@ -172,7 +176,7 @@ inline void fatal(Logger& logger, fmt::format_string<Args...> fmt, Args&&... arg
 // stream style api
 inline impl::LogStream log(LogLevel level)
 {
-  return impl::LogStream(impl::get_default_logger(), level);
+  return impl::LogStream(get_default_logger(), level);
 }
 inline impl::LogStream log(Logger& logger, LogLevel level)
 {
@@ -227,8 +231,8 @@ inline impl::LogStream fatal(Logger& logger)
  */
 void configure_logger(Logger& logger);
 /**
- * @brief obtain a named logger
+ * @brief obtain a named logger configured to use the default sink
  */
-Logger get_default_logger(const std::string& name);
+Logger get_logger_with_default_sink(const std::string& name);
 
 }  // namespace duatic::message_logger
