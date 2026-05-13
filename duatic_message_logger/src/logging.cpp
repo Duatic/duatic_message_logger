@@ -72,6 +72,11 @@ void configure_logger(Logger& logger)
 {
   logger_ = logger;
 }
+void configure_logger_with_default_sink(Logger& logger)
+{
+  logger_ = logger;
+  logger_.sinks().push_back(sink_);
+}
 Logger get_logger_with_default_sink(const std::string& name)
 {
   return spdlog::logger(name, sink_);

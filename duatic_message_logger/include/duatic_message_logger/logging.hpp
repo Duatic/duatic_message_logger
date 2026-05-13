@@ -231,6 +231,10 @@ inline impl::LogStream fatal(Logger& logger)
  */
 void configure_logger(Logger& logger);
 /**
+ * @brief configure the default logger and add the default sink to it
+ */
+void configure_logger_with_default_sink(Logger& logger);
+/**
  * @brief obtain a named logger configured to use the default sink
  */
 Logger get_logger_with_default_sink(const std::string& name);
