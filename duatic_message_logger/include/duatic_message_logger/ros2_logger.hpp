@@ -40,36 +40,37 @@ namespace duatic::message_logger
 class ROS2Sink : public spdlog::sinks::sink
 {
 public:
-  explicit ROS2Sink(rclcpp::Logger logger) : logger_(logger)
+  ROS2Sink()
   {
   }
 
   void log(const spdlog::details::log_msg& msg) override
   {
+    auto ros_logger = rclcpp::get_logger(std::string(msg.logger_name.begin(), msg.logger_name.end()));
     std::string s(msg.payload.begin(), msg.payload.end());
 
     switch (msg.level) {
       case spdlog::level::trace:
       case spdlog::level::debug:
-        RCLCPP_DEBUG_STREAM(logger_, s);
+        RCLCPP_DEBUG_STREAM(ros_logger, s);
         break;
       case spdlog::level::info:
-        RCLCPP_INFO_STREAM(logger_, s);
+        RCLCPP_INFO_STREAM(ros_logger, s);
         break;
       case spdlog::level::warn:
-        RCLCPP_WARN_STREAM(logger_, s);
+        RCLCPP_WARN_STREAM(ros_logger, s);
         break;
       case spdlog::level::err:
-        RCLCPP_ERROR_STREAM(logger_, s);
+        RCLCPP_ERROR_STREAM(ros_logger, s);
         break;
       case spdlog::level::critical:
-        RCLCPP_FATAL_STREAM(logger_, s);
+        RCLCPP_FATAL_STREAM(ros_logger, s);
         break;
       case spdlog::level::off:
         // do nothing
         break;
       default:
-        RCLCPP_INFO_STREAM(logger_, s);
+        RCLCPP_INFO_STREAM(ros_logger, s);
         break;
     }
   }
@@ -88,7 +89,6 @@ public:
   }
 
 private:
-  rclcpp::Logger logger_;
   std::unique_ptr<spdlog::formatter> formatter_;
 };
 

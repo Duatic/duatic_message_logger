@@ -34,7 +34,7 @@ namespace duatic::message_logger
 // As soon as rclcpp is found we default to the ros2 logging infrastructure
 // otherwise we use std::cout logging via spdlog
 #ifdef ENABLE_ROS2_LOGGING
-static auto sink_{ std::make_shared<ROS2Sink>(rclcpp::get_logger("default")) };
+static auto sink_{ std::make_shared<ROS2Sink>() };
 #else
 static auto sink_{ std::make_shared<spdlog::sinks::stdout_color_sink_mt>() };
 #endif

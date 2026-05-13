@@ -95,7 +95,17 @@ TEST(Logging, ExplicitLogger)
   // stream style
   duatic::message_logger::debug(logger) << "Test debug"
                                         << "test" << std::endl;
-  duatic::message_logger::info(logger) << "Test info";
+  duatic::message_logger::info(logger) << "Test info (stream)";
+  duatic::message_logger::warning(logger) << "Test warning";
+  duatic::message_logger::error(logger) << "Test error";
+  duatic::message_logger::fatal(logger) << "Test fatal";
+}
+TEST(Logging, LoggerWithName)
+{
+  auto logger = duatic::message_logger::get_logger_with_default_sink("test_with_name");
+
+  duatic::message_logger::debug(logger) << "Test debug" << logger.name() << std::endl;
+  duatic::message_logger::info(logger) << "Test info " << logger.name();
   duatic::message_logger::warning(logger) << "Test warning";
   duatic::message_logger::error(logger) << "Test error";
   duatic::message_logger::fatal(logger) << "Test fatal";
