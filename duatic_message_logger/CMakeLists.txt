@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 project(duatic_message_logger)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -19,6 +17,20 @@ target_include_directories(duatic_message_logger PUBLIC
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
 target_link_libraries(duatic_message_logger
   spdlog::spdlog
+)
+target_compile_options(duatic_message_logger PRIVATE
+  -Wall
+  -Wextra
+  -Wpedantic
+  -Wshadow
+  -Wnon-virtual-dtor
+  -Wconversion
+  -Wundef
+  -Wformat=2
+  -Wsign-conversion
+  -Wnull-dereference
+  -Werror=return-type
+  -fPIC # As this is used in ros2control as plugin -> generate platform indipendent code
 )
 
 if(rclcpp_FOUND)
