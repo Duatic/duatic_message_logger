@@ -31,7 +31,6 @@
 // See https://github.com/leggedrobotics/message_logger
 
 // NOTE we only implement a subset of the API but the most commonly used one
-// The _throttle_ variants are just redirecting to the other versions
 
 #define MELO_DEBUG(...) duatic::message_logger::debug(__VA_ARGS__);
 #define MELO_DEBUG_STREAM(message) (duatic::message_logger::debug() << message);
