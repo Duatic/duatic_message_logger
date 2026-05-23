@@ -35,23 +35,63 @@
 
 #define MELO_DEBUG(...) duatic::message_logger::debug(__VA_ARGS__);
 #define MELO_DEBUG_STREAM(message) (duatic::message_logger::debug() << message);
-#define MELO_DEBUG_THROTTLE_STREAM(rate, message) MELO_DEBUG_STREAM(message)
+#define MELO_DEBUG_THROTTLE_STREAM(rate, message)                                                                      \
+  do {                                                                                                                 \
+    static auto last_log_time = std::chrono::steady_clock::time_point::min();                                          \
+    const auto now = std::chrono::steady_clock::now();                                                                 \
+    if (now - last_log_time >= std::chrono::duration<double>(rate)) {                                                  \
+      last_log_time = now;                                                                                             \
+      MELO_DEBUG_STREAM(message);                                                                                      \
+    }                                                                                                                  \
+  } while (0);
 
 #define MELO_INFO(...) duatic::message_logger::info(__VA_ARGS__);
 #define MELO_INFO_STREAM(message) (duatic::message_logger::info() << message);
-#define MELO_INFO_THROTTLE_STREAM(rate, message) MELO_INFO_STREAM(message)
+#define MELO_INFO_THROTTLE_STREAM(rate, message)                                                                       \
+  do {                                                                                                                 \
+    static auto last_log_time = std::chrono::steady_clock::time_point::min();                                          \
+    const auto now = std::chrono::steady_clock::now();                                                                 \
+    if (now - last_log_time >= std::chrono::duration<double>(rate)) {                                                  \
+      last_log_time = now;                                                                                             \
+      MELO_INFO_STREAM(message);                                                                                       \
+    }                                                                                                                  \
+  } while (0);
 
 #define MELO_WARN(...) duatic::message_logger::warning(__VA_ARGS__);
 #define MELO_WARN_STREAM(message) (duatic::message_logger::warning() << message);
-#define MELO_WARN_THROTTLE_STREAM(rate, message) MELO_WARN_STREAM(message)
+#define MELO_WARN_THROTTLE_STREAM(rate, message)                                                                       \
+  do {                                                                                                                 \
+    static auto last_log_time = std::chrono::steady_clock::time_point::min();                                          \
+    const auto now = std::chrono::steady_clock::now();                                                                 \
+    if (now - last_log_time >= std::chrono::duration<double>(rate)) {                                                  \
+      last_log_time = now;                                                                                             \
+      MELO_WARN_STREAM(message);                                                                                       \
+    }                                                                                                                  \
+  } while (0);
 
 #define MELO_ERROR(...) duatic::message_logger::error(__VA_ARGS__);
 #define MELO_ERROR_STREAM(message) (duatic::message_logger::error() << message);
-#define MELO_ERROR_THROTTLE_STREAM(rate, message) MELO_ERROR_STREAM(message)
+#define MELO_ERROR_THROTTLE_STREAM(rate, message)                                                                      \
+  do {                                                                                                                 \
+    static auto last_log_time = std::chrono::steady_clock::time_point::min();                                          \
+    const auto now = std::chrono::steady_clock::now();                                                                 \
+    if (now - last_log_time >= std::chrono::duration<double>(rate)) {                                                  \
+      last_log_time = now;                                                                                             \
+      MELO_ERROR_STREAM(message);                                                                                      \
+    }                                                                                                                  \
+  } while (0);
 
 #define MELO_FATAL(...) duatic::message_logger::error(__VA_ARGS__);
 #define MELO_FATAL_STREAM(message) (duatic::message_logger::error() << message);
-#define MELO_FATAL_THROTTLE_STREAM(rate, message) MELO_FATAL_STREAM(message)
+#define MELO_FATAL_THROTTLE_STREAM(rate, message)                                                                      \
+  do {                                                                                                                 \
+    static auto last_log_time = std::chrono::steady_clock::time_point::min();                                          \
+    const auto now = std::chrono::steady_clock::now();                                                                 \
+    if (now - last_log_time >= std::chrono::duration<double>(rate)) {                                                  \
+      last_log_time = now;                                                                                             \
+      MELO_FATAL_STREAM(message);                                                                                      \
+    }                                                                                                                  \
+  } while (0);
 
 namespace message_logger::log::levels
 {
