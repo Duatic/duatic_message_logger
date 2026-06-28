@@ -18,7 +18,7 @@ target_include_directories(duatic_message_logger PUBLIC
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
 target_link_libraries(duatic_message_logger
   spdlog::spdlog
-  fmt::fmt 
+  fmt::fmt
 )
 target_compile_options(duatic_message_logger PRIVATE
   -Wall
