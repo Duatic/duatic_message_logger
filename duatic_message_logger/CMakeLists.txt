@@ -7,6 +7,7 @@ project(duatic_message_logger)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
 find_package(rclcpp)
 
 add_library(duatic_message_logger src/logging.cpp)
@@ -17,6 +18,7 @@ target_include_directories(duatic_message_logger PUBLIC
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
 target_link_libraries(duatic_message_logger
   spdlog::spdlog
+  fmt::fmt
 )
 target_compile_options(duatic_message_logger PRIVATE
   -Wall
@@ -76,5 +78,5 @@ ament_export_libraries(
 ament_export_targets(
   export_${PROJECT_NAME}
 )
-ament_export_dependencies(spdlog rclcpp)
+ament_export_dependencies(spdlog fmt rclcpp)
 ament_package()
