@@ -2,7 +2,10 @@
 
 A modern c++20 logging solution which can either log to a ROS2 backend or be used standalone
 
-[![Humble](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-humble.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-humble.yml) [![Jazzy](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-jazzy.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-jazzy.yml)  [![Kilted](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-kilted.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-kilted.yml) [![Lyrical](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-lyrical.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-lyrical.yml) [![Rolling](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-rolling.yml/badge.svg?branch=main)](https://github.com/Duatic/duatic_message_logger/actions/workflows/build-rolling.yml)
+[![Jazzy](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-jazzy.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
+[![Kilted](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-kilted.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
+[![Lyrical](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-lyrical.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
+[![Rolling](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-rolling.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
 
 
 It provides a compat header with the old `MELO` style logging macros.
