@@ -85,5 +85,9 @@ Logger& get_default_logger()
 {
   return logger_;
 }
+void configure_level(const LogLevel maximum_log_level)
+{
+  sink_->set_level(convert_level(maximum_log_level));
+}
 
 }  // namespace duatic::message_logger

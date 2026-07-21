@@ -239,4 +239,9 @@ void configure_logger_with_default_sink(Logger& logger);
  */
 Logger get_logger_with_default_sink(const std::string& name);
 
+/**
+ * @brief configure the maximum log level of the default sink (and therefore all attached loggers)
+ */
+void configure_level(const LogLevel maximum_log_level);
+
 }  // namespace duatic::message_logger
