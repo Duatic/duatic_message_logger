@@ -23,6 +23,7 @@
  */
 #include "duatic_message_logger/logging.hpp"
 
+#include "spdlog/sinks/sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 #ifdef ENABLE_ROS2_LOGGING
@@ -31,15 +32,29 @@
 
 namespace duatic::message_logger
 {
-// As soon as rclcpp is found we default to the ros2 logging infrastructure
-// otherwise we use std::cout logging via spdlog
-#ifdef ENABLE_ROS2_LOGGING
-static auto sink_{ std::make_shared<ROS2Sink>() };
-#else
-static auto sink_{ std::make_shared<spdlog::sinks::stdout_color_sink_mt>() };
-#endif
+namespace
+{
 
-static spdlog::logger logger_{ "global_logger", sink_ };
+// The default sink and the default logger are created on first use and are deliberately never destroyed.
+// if rclcpp is found we default to the ros2 logging infrastructure, otherwise we use std::cout logging via
+// spdlog.
+spdlog::sink_ptr& default_sink()
+{
+#ifdef ENABLE_ROS2_LOGGING
+  static spdlog::sink_ptr& sink{ *new spdlog::sink_ptr{ std::make_shared<ROS2Sink>() } };
+#else
+  static spdlog::sink_ptr& sink{ *new spdlog::sink_ptr{ std::make_shared<spdlog::sinks::stdout_color_sink_mt>() } };
+#endif
+  return sink;
+}
+
+Logger& default_logger()
+{
+  static Logger& logger{ *new Logger{ "global_logger", default_sink() } };
+  return logger;
+}
+
+}  // namespace
 
 // Helper functions to convert our own log level into the library used log level
 static constexpr spdlog::level::level_enum convert_level(const LogLevel level)
@@ -70,24 +85,25 @@ LogStream::~LogStream()
 
 void configure_logger(Logger& logger)
 {
-  logger_ = logger;
+  default_logger() = logger;
 }
 void configure_logger_with_default_sink(Logger& logger)
 {
-  logger_ = logger;
-  logger_.sinks().push_back(sink_);
+  Logger& configured = default_logger();
+  configured = logger;
+  configured.sinks().push_back(default_sink());
 }
 Logger get_logger_with_default_sink(const std::string& name)
 {
-  return spdlog::logger(name, sink_);
+  return spdlog::logger(name, default_sink());
 }
 Logger& get_default_logger()
 {
-  return logger_;
+  return default_logger();
 }
 void configure_level(const LogLevel maximum_log_level)
 {
-  sink_->set_level(convert_level(maximum_log_level));
+  default_sink()->set_level(convert_level(maximum_log_level));
 }
 
 }  // namespace duatic::message_logger
