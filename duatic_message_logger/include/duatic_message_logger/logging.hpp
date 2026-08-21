@@ -46,6 +46,13 @@ enum class LogLevel
 };
 
 /**
+ * @brief parse the LogLevel from the given string
+ */
+[[nodiscard]] std::optional<LogLevel> parse_level_from_string(std::string_view text) noexcept;
+
+std::ostream& operator<<(std::ostream& os, const LogLevel level);
+
+/**
  * @brief obtain the currently configured default logger
  */
 Logger& get_default_logger();

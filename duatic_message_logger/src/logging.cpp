@@ -32,6 +32,45 @@
 
 namespace duatic::message_logger
 {
+
+[[nodiscard]] std::optional<LogLevel> parse_level_from_string(std::string_view text) noexcept
+{
+  const auto lower = [](char c) noexcept { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; };
+  const auto matches = [&](std::string_view name) noexcept {
+    return std::ranges::equal(text, name, [&](char a, char b) noexcept { return lower(a) == lower(b); });
+  };
+
+  if (matches("debug"))
+    return LogLevel::Debug;
+  if (matches("info"))
+    return LogLevel::Info;
+  if (matches("warning"))
+    return LogLevel::Warning;
+  if (matches("error"))
+    return LogLevel::Error;
+  if (matches("fatal"))
+    return LogLevel::Fatal;
+
+  return std::nullopt;
+}
+
+std::ostream& operator<<(std::ostream& os, const LogLevel level)
+{
+  switch (level) {
+    case LogLevel::Debug:
+      return os << "Debug";
+    case LogLevel::Info:
+      return os << "Info";
+    case LogLevel::Warning:
+      return os << "Warning";
+    case LogLevel::Error:
+      return os << "Error";
+    case LogLevel::Fatal:
+      return os << "Fatal";
+  }
+  return os << "Invalid LogLevel";
+}
+
 namespace
 {
 
