@@ -27,6 +27,7 @@
 #include <utility>
 #include <memory>
 #include <sstream>
+#include <optional>
 
 #include <spdlog/spdlog.h>  // NOLINT(build/include_order)
 
