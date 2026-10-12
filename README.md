@@ -2,10 +2,10 @@
 
 A modern c++20 logging solution which can either log to a ROS2 backend or be used standalone
 
-[![Jazzy](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-jazzy.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
-[![Kilted](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-kilted.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
-[![Lyrical](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-lyrical.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
-[![Rolling](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/mbloechli/fc9d126a4ab745f8a8d37f9b6b6c83a9/raw/duatic_message_logger-rolling.json)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
+[![Jazzy](https://github.com/Duatic/duatic_message_logger/raw/badges/jazzy.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
+[![Kilted](https://github.com/Duatic/duatic_message_logger/raw/badges/kilted.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
+[![Lyrical](https://github.com/Duatic/duatic_message_logger/raw/badges/lyrical.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
+[![Rolling](https://github.com/Duatic/duatic_message_logger/raw/badges/rolling.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
 
 
 It provides a compat header with the old `MELO` style logging macros.
