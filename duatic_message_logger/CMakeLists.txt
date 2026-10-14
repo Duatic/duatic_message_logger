@@ -32,7 +32,7 @@ target_compile_options(duatic_message_logger PRIVATE
   -Wsign-conversion
   -Wnull-dereference
   -Werror=return-type
-  -fPIC # As this is used in ros2control as plugin -> generate platform indipendent code
+  -fPIC # As this is used in ros2control as plugin -> generate platform independent code
 )
 
 if(rclcpp_FOUND)

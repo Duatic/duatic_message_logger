@@ -81,11 +81,13 @@ public:
     manip(oss_);
     return *this;
   }
+
   LogStream& operator<<(std::ios_base& (*manip)(std::ios_base&))
   {
     manip(oss_);
     return *this;
   }
+
   // Implemented in cpp file to hide direct spdlog reference
   ~LogStream();
 
@@ -119,6 +121,7 @@ inline void log(Logger& logger, LogLevel level, fmt::format_string<Args...> fmt,
       break;
   }
 }
+
 template <typename... Args>
 inline void log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
 {
@@ -130,6 +133,7 @@ inline void debug(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Debug, fmt, std::forward<Args>(args)...);
 }
+
 template <typename... Args>
 inline void debug(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
@@ -141,6 +145,7 @@ inline void info(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Info, fmt, std::forward<Args>(args)...);
 }
+
 template <typename... Args>
 inline void info(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
@@ -164,6 +169,7 @@ inline void error(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Error, fmt, std::forward<Args>(args)...);
 }
+
 template <typename... Args>
 inline void error(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
@@ -175,6 +181,7 @@ inline void fatal(fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
+
 template <typename... Args>
 inline void fatal(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
@@ -186,14 +193,17 @@ inline impl::LogStream log(LogLevel level)
 {
   return impl::LogStream(get_default_logger(), level);
 }
+
 inline impl::LogStream log(Logger& logger, LogLevel level)
 {
   return impl::LogStream(logger, level);
 }
+
 inline impl::LogStream debug()
 {
   return log(LogLevel::Debug);
 }
+
 inline impl::LogStream debug(Logger& logger)
 {
   return log(logger, LogLevel::Debug);
@@ -203,6 +213,7 @@ inline impl::LogStream info()
 {
   return log(LogLevel::Info);
 }
+
 inline impl::LogStream info(Logger& logger)
 {
   return log(logger, LogLevel::Info);
@@ -212,29 +223,34 @@ inline impl::LogStream warning()
 {
   return log(LogLevel::Warning);
 }
+
 inline impl::LogStream warning(Logger& logger)
 {
   return log(logger, LogLevel::Warning);
 }
+
 inline impl::LogStream error()
 {
   return log(LogLevel::Error);
 }
+
 inline impl::LogStream error(Logger& logger)
 {
   return log(logger, LogLevel::Error);
 }
+
 inline impl::LogStream fatal()
 {
   return log(LogLevel::Fatal);
 }
+
 inline impl::LogStream fatal(Logger& logger)
 {
   return log(logger, LogLevel::Fatal);
 }
 
 /**
- * @brief configure the default logger which is used if no logger is pased to the functions
+ * @brief configure the default logger which is used if no logger is passed to the functions
  * @note this also changes the per default used sink !
  */
 void configure_logger(Logger& logger);
