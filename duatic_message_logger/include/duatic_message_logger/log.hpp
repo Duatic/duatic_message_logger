@@ -24,6 +24,7 @@
 #pragma once
 
 #include "duatic_message_logger/logging.hpp"
+
 // This simply provide a convenience wrapper for all the log functions so one does not need the full namespace
 
 namespace logging

@@ -29,8 +29,7 @@
 TEST(Logging, DefaultOutput)
 {
   // Test stream like usage
-  duatic::message_logger::debug() << "Test debug"
-                                  << "test" << std::endl;
+  duatic::message_logger::debug() << "Test debug" << "test" << std::endl;
   duatic::message_logger::info() << "Test info";
   duatic::message_logger::warning() << "Test warning";
   duatic::message_logger::error() << "Test error";
@@ -62,8 +61,7 @@ TEST(Logging, StandardOut)
   spdlog::logger logger{ "test", sink };
   duatic::message_logger::configure_logger(logger);
 
-  duatic::message_logger::debug() << "Test debug"
-                                  << "test" << std::endl;
+  duatic::message_logger::debug() << "Test debug" << "test" << std::endl;
   duatic::message_logger::info() << "Test info";
   duatic::message_logger::warning() << "Test warning";
   duatic::message_logger::error() << "Test error";
@@ -93,13 +91,13 @@ TEST(Logging, ExplicitLogger)
   duatic::message_logger::fatal(logger, "Fatal {}", 1);
 
   // stream style
-  duatic::message_logger::debug(logger) << "Test debug"
-                                        << "test" << std::endl;
+  duatic::message_logger::debug(logger) << "Test debug" << "test" << std::endl;
   duatic::message_logger::info(logger) << "Test info (stream)";
   duatic::message_logger::warning(logger) << "Test warning";
   duatic::message_logger::error(logger) << "Test error";
   duatic::message_logger::fatal(logger) << "Test fatal";
 }
+
 TEST(Logging, LoggerWithName)
 {
   auto logger = duatic::message_logger::get_logger_with_default_sink("test_with_name");

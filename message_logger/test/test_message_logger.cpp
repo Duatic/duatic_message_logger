@@ -25,6 +25,7 @@
 
 // Test old melo style api
 #include "message_logger/message_logger.hpp"
+
 TEST(Logging, Melo)
 {
   MELO_INFO("{}", 1);

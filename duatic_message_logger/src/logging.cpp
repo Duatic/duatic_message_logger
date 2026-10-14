@@ -126,20 +126,24 @@ void configure_logger(Logger& logger)
 {
   default_logger() = logger;
 }
+
 void configure_logger_with_default_sink(Logger& logger)
 {
   Logger& configured = default_logger();
   configured = logger;
   configured.sinks().push_back(default_sink());
 }
+
 Logger get_logger_with_default_sink(const std::string& name)
 {
   return spdlog::logger(name, default_sink());
 }
+
 Logger& get_default_logger()
 {
   return default_logger();
 }
+
 void configure_level(const LogLevel maximum_log_level)
 {
   default_sink()->set_level(convert_level(maximum_log_level));
