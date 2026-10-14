@@ -25,4 +25,5 @@ jobs:
       ros_distro: ${{ inputs.ros_distro }}
       extra_distros: humble
       badge_branch: true
+      devtools_ref: v1
     secrets: inherit
