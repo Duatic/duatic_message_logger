@@ -2,6 +2,7 @@
 
 A modern c++20 logging solution which can either log to a ROS2 backend or be used standalone
 
+[![Humble](https://github.com/Duatic/duatic_message_logger/raw/badges/humble.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
 [![Jazzy](https://github.com/Duatic/duatic_message_logger/raw/badges/jazzy.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
 [![Kilted](https://github.com/Duatic/duatic_message_logger/raw/badges/kilted.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
 [![Lyrical](https://github.com/Duatic/duatic_message_logger/raw/badges/lyrical.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
