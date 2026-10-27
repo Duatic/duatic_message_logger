@@ -1,6 +1,6 @@
 # duatic_message_logger
 
-A modern c++20 logging solution which can either log to a ROS2 backend or be used standalone
+A modern c++20 logging solution on spdlog. `duatic_message_logger` has no ROS dependency; `duatic_message_logger_ros` routes its output to ROS 2.
 
 [![Humble](https://github.com/Duatic/duatic_message_logger/raw/badges/humble.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
 [![Jazzy](https://github.com/Duatic/duatic_message_logger/raw/badges/jazzy.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
@@ -127,6 +127,26 @@ Use this in case the `logging` namespace is too general for you
 duatic::message_logger::debug("Debug {}", 1);
 
 ```
+
+## 7. ROS 2
+
+Without further setup, everything logged through the default sink goes to stdout. In a ROS 2 program, depend on
+`duatic_message_logger_ros` and call `use_ros_logging()` once, early, for example in a node's constructor or a
+hardware interface's `on_init`. Loggers created before the call follow it too.
+
+```c++
+#include "duatic_message_logger_ros/ros_logging.hpp"
+
+...
+duatic::message_logger::ros::use_ros_logging();
+```
+
+```cmake
+find_package(duatic_message_logger_ros REQUIRED)
+target_link_libraries(my_target duatic_message_logger_ros::duatic_message_logger_ros)
+```
+
+`set_default_sink()` routes the default sink to any other spdlog sink in the same way.
 
 # Contributing
 
