@@ -253,7 +253,8 @@ Logger get_logger_with_default_sink(const std::string& name);
 void configure_level(const LogLevel maximum_log_level);
 
 /**
- * @brief route everything written to the default sink to another sink, by default stdout
+ * @brief route everything written to the default sink to another sink
+ * @note by default it goes to ROS 2 logging when the process has rcutils loaded, to stdout otherwise
  * @note applies to loggers created before the call as well, they keep the default sink but it forwards elsewhere
  */
 void set_default_sink(spdlog::sink_ptr sink);

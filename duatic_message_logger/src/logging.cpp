@@ -25,7 +25,8 @@
 
 #include "spdlog/sinks/dist_sink.h"
 #include "spdlog/sinks/sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
+
+#include "rcutils_sink.hpp"
 
 namespace duatic::message_logger
 {
@@ -72,12 +73,13 @@ namespace
 {
 
 // The default sink and the default logger are created on first use and are deliberately never destroyed.
-// The default sink forwards to stdout until set_default_sink() points it elsewhere.
+// The default sink forwards to ROS 2 logging when the process has it loaded, to stdout otherwise, until
+// set_default_sink() points it elsewhere.
 std::shared_ptr<spdlog::sinks::dist_sink_mt>& forwarding_sink()
 {
   static std::shared_ptr<spdlog::sinks::dist_sink_mt>& sink{ *new std::shared_ptr<spdlog::sinks::dist_sink_mt>{
       std::make_shared<spdlog::sinks::dist_sink_mt>(
-          std::vector<spdlog::sink_ptr>{ std::make_shared<spdlog::sinks::stdout_color_sink_mt>() }) } };
+          std::vector<spdlog::sink_ptr>{ std::make_shared<detail::RcutilsSink>() }) } };
   return sink;
 }
 

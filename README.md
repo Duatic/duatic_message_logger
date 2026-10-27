@@ -1,6 +1,6 @@
 # duatic_message_logger
 
-A modern c++20 logging solution on spdlog. `duatic_message_logger` has no ROS dependency; `duatic_message_logger_ros` routes its output to ROS 2.
+A modern c++20 logging solution on spdlog, with no ROS dependency, that logs through ROS 2 when the process uses it.
 
 [![Humble](https://github.com/Duatic/duatic_message_logger/raw/badges/humble.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
 [![Jazzy](https://github.com/Duatic/duatic_message_logger/raw/badges/jazzy.svg)](https://github.com/Duatic/duatic_message_logger/actions/workflows/ci.yml)
@@ -130,23 +130,12 @@ duatic::message_logger::debug("Debug {}", 1);
 
 ## 7. ROS 2
 
-Without further setup, everything logged through the default sink goes to stdout. In a ROS 2 program, depend on
-`duatic_message_logger_ros` and call `use_ros_logging()` once, early, for example in a node's constructor or a
-hardware interface's `on_init`. Loggers created before the call follow it too.
+The logger has no ROS dependency. In a process that has ROS 2 loaded, the default sink writes through the ROS 2
+logging system (rcutils), so messages appear in the console and in `/rosout` like any ROS log, with no setup in the
+program. Elsewhere it writes to stdout. The rcutils functions are looked up at runtime, so neither the library nor its
+package depends on ROS.
 
-```c++
-#include "duatic_message_logger_ros/ros_logging.hpp"
-
-...
-duatic::message_logger::ros::use_ros_logging();
-```
-
-```cmake
-find_package(duatic_message_logger_ros REQUIRED)
-target_link_libraries(my_target duatic_message_logger_ros::duatic_message_logger_ros)
-```
-
-`set_default_sink()` routes the default sink to any other spdlog sink in the same way.
+`set_default_sink()` routes the default sink to any other spdlog sink, also for loggers created before the call.
 
 # Contributing
 

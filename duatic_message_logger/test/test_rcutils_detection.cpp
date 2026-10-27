@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2026 Duatic AG
  *
@@ -32,15 +31,16 @@
 #include <rcutils/logging.h>  // NOLINT(build/include_order)
 
 #include "duatic_message_logger/logging.hpp"
-#include "duatic_message_logger_ros/ros_logging.hpp"
 
 namespace
 {
 std::vector<std::string> messages;
 
-void capture(const rcutils_log_location_t* /*location*/, int /*severity*/, const char* name,
+// Fails on a missing location, as the rosout handler of a ROS 2 node would crash on it
+void capture(const rcutils_log_location_t* location, int /*severity*/, const char* name,
              rcutils_time_point_value_t /*timestamp*/, const char* format, va_list* args)
 {
+  ASSERT_NE(location, nullptr);
   char buffer[256];
   va_list copy;
   va_copy(copy, *args);
@@ -50,15 +50,15 @@ void capture(const rcutils_log_location_t* /*location*/, int /*severity*/, const
 }
 }  // namespace
 
-TEST(RosLogging, LoggersCreatedBeforeTheCallReachRos)
+// The test links rcutils, as a ROS 2 process does; the logger itself does not
+TEST(RcutilsDetection, DefaultSinkWritesThroughRcutils)
 {
-  auto logger = duatic::message_logger::get_logger_with_default_sink("created_before");
+  auto logger = duatic::message_logger::get_logger_with_default_sink("detected");
   ASSERT_EQ(rcutils_logging_initialize(), RCUTILS_RET_OK);
   rcutils_logging_set_output_handler(capture);
 
-  duatic::message_logger::ros::use_ros_logging();
   duatic::message_logger::info(logger, "hello {}", 1);
 
   ASSERT_FALSE(messages.empty());
-  EXPECT_EQ(messages.back(), "created_before: hello 1");
+  EXPECT_EQ(messages.back(), "detected: hello 1");
 }

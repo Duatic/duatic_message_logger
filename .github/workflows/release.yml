@@ -8,7 +8,6 @@ on:
         type: choice
         options:
           - duatic_message_logger
-          - duatic_message_logger_ros
           - message_logger
       bump:
         description: 'Override the bump derived from the commits'
