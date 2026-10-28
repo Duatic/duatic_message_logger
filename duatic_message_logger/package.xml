@@ -5,7 +5,7 @@
   <version>1.0.0</version>
   <description>A modern c++20 logging abstraction which can be used without ROS2</description>
   <maintainer email="lnachtigall@duatic.com">Lennart Nachtigall</maintainer>
-  <license>BSD3-Clause</license>
+  <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
@@ -19,5 +19,6 @@
 
   <export>
     <build_type>ament_cmake</build_type>
+    <duatic_archive_root>public</duatic_archive_root>
   </export>
 </package>
