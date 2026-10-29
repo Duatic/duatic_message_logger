@@ -80,6 +80,13 @@ std::FILE* output_stream()
 void* find_symbol([[maybe_unused]] const char* name)
 {
 #if defined(__unix__) || defined(__APPLE__)
+  // A library loaded privately, as Python loads extension modules and their dependencies, is not in the global scope;
+  // RTLD_NOLOAD returns it only if it is already loaded, so this never loads ROS
+  if (void* rcutils = dlopen("librcutils.so", RTLD_LAZY | RTLD_NOLOAD); rcutils != nullptr) {
+    if (void* symbol = dlsym(rcutils, name); symbol != nullptr) {
+      return symbol;
+    }
+  }
   return dlsym(RTLD_DEFAULT, name);
 #else
   return nullptr;
