@@ -3,7 +3,7 @@
 <package format="3">
   <name>duatic_message_logger</name>
   <version>1.0.0</version>
-  <description>A modern c++20 logging abstraction which can be used without ROS2</description>
+  <description>A modern c++20 logging abstraction on spdlog, with no ROS dependency</description>
   <maintainer email="lnachtigall@duatic.com">Lennart Nachtigall</maintainer>
   <license>BSD-3-Clause</license>
 
@@ -11,11 +11,10 @@
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>rcutils</test_depend>
 
   <depend>spdlog</depend>
-
-  <!--This is purely optional but enables the ROS2 logging backend-->
-  <depend>rclcpp</depend>
+  <depend>fmt</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

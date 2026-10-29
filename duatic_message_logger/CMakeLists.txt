@@ -8,9 +8,8 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
-find_package(rclcpp)
 
-add_library(duatic_message_logger src/logging.cpp)
+add_library(duatic_message_logger src/logging.cpp src/rcutils_sink.cpp)
 add_library(duatic_message_logger::duatic_message_logger ALIAS duatic_message_logger)
 target_compile_features(duatic_message_logger PUBLIC c_std_99 cxx_std_20)  # Require C99 and C++20
 target_include_directories(duatic_message_logger PUBLIC
@@ -19,6 +18,7 @@ target_include_directories(duatic_message_logger PUBLIC
 target_link_libraries(duatic_message_logger
   spdlog::spdlog
   fmt::fmt
+  ${CMAKE_DL_LIBS}
 )
 target_compile_options(duatic_message_logger PRIVATE
   -Wall
@@ -35,21 +35,15 @@ target_compile_options(duatic_message_logger PRIVATE
   -fPIC # As this is used in ros2control as plugin -> generate platform indipendent code
 )
 
-if(rclcpp_FOUND)
-  message(STATUS "rclcpp found - building with ROS2 logging support")
-  target_link_libraries(duatic_message_logger
-    rclcpp::rclcpp
-  )
-  target_compile_definitions(duatic_message_logger PRIVATE "ENABLE_ROS2_LOGGING")
-endif()
-
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(duatic_message_logger PRIVATE "DUATIC_MESSAGE_LOGGER_BUILDING_LIBRARY")
 
+# detail/ holds the library's own headers, used only to build it
 install(
   DIRECTORY include/
   DESTINATION include/${PROJECT_NAME}
+  PATTERN "detail" EXCLUDE
 )
 install(
   TARGETS duatic_message_logger
@@ -67,6 +61,13 @@ if(BUILD_TESTING)
   target_link_libraries(test_logging
     duatic_message_logger
   )
+
+  # Stands in for a ROS 2 process: rcutils is linked by the test, not by the library
+  find_package(rcutils QUIET)
+  if(rcutils_FOUND)
+    ament_add_gtest(test_rcutils_detection test/test_rcutils_detection.cpp)
+    target_link_libraries(test_rcutils_detection duatic_message_logger rcutils::rcutils)
+  endif()
 endif()
 
 ament_export_include_directories(
@@ -78,5 +79,5 @@ ament_export_libraries(
 ament_export_targets(
   export_${PROJECT_NAME}
 )
-ament_export_dependencies(spdlog fmt rclcpp)
+ament_export_dependencies(spdlog fmt)
 ament_package()
