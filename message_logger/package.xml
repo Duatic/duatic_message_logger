@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>Compat package for the old MELO message logger</description>
   <maintainer email="lnachtigall@duatic.com">Lennart Nachtigall</maintainer>
-  <license>BSD3-Clause</license>
+  <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
@@ -16,5 +16,6 @@
 
   <export>
     <build_type>ament_cmake</build_type>
+    <duatic_archive_root>public</duatic_archive_root>
   </export>
 </package>
