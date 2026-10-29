@@ -26,7 +26,7 @@
 #include "spdlog/sinks/dist_sink.h"
 #include "spdlog/sinks/sink.h"
 
-#include "rcutils_sink.hpp"
+#include "duatic_message_logger/detail/rcutils_sink.hpp"
 
 namespace duatic::message_logger
 {

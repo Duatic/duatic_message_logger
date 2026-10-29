@@ -39,9 +39,11 @@ target_compile_options(duatic_message_logger PRIVATE
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(duatic_message_logger PRIVATE "DUATIC_MESSAGE_LOGGER_BUILDING_LIBRARY")
 
+# detail/ holds the library's own headers, used only to build it
 install(
   DIRECTORY include/
   DESTINATION include/${PROJECT_NAME}
+  PATTERN "detail" EXCLUDE
 )
 install(
   TARGETS duatic_message_logger
