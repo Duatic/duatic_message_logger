@@ -24,13 +24,41 @@
 #include <gtest/gtest.h>
 
 #include <cstdarg>
+#include <cstddef>
 #include <cstdio>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <rcutils/logging.h>  // NOLINT(build/include_order)
 
+#include "duatic_message_logger/detail/rcutils_sink.hpp"
 #include "duatic_message_logger/logging.hpp"
+
+namespace detail = duatic::message_logger::detail;
+
+// The logger declares the rcutils API itself; these break the build if rcutils changes it
+static_assert(sizeof(detail::RcutilsLocation) == sizeof(rcutils_log_location_t));
+static_assert(alignof(detail::RcutilsLocation) == alignof(rcutils_log_location_t));
+static_assert(offsetof(detail::RcutilsLocation, function_name) == offsetof(rcutils_log_location_t, function_name));
+static_assert(offsetof(detail::RcutilsLocation, file_name) == offsetof(rcutils_log_location_t, file_name));
+static_assert(offsetof(detail::RcutilsLocation, line_number) == offsetof(rcutils_log_location_t, line_number));
+static_assert(
+    std::is_same_v<decltype(detail::RcutilsLocation::function_name), decltype(rcutils_log_location_t::function_name)>);
+static_assert(
+    std::is_same_v<decltype(detail::RcutilsLocation::file_name), decltype(rcutils_log_location_t::file_name)>);
+static_assert(
+    std::is_same_v<decltype(detail::RcutilsLocation::line_number), decltype(rcutils_log_location_t::line_number)>);
+// Each initialization compiles only if the function type matches exactly
+[[maybe_unused]] constexpr void (*expected_log)(const rcutils_log_location_t*, int, const char*, const char*,
+                                                ...) = &rcutils_log;
+[[maybe_unused]] constexpr detail::RcutilsIsEnabledFor expected_is_enabled_for = &rcutils_logging_logger_is_enabled_for;
+[[maybe_unused]] constexpr detail::RcutilsInitialize expected_initialize = &rcutils_logging_initialize;
+static_assert(detail::rcutils_severity_debug == RCUTILS_LOG_SEVERITY_DEBUG);
+static_assert(detail::rcutils_severity_info == RCUTILS_LOG_SEVERITY_INFO);
+static_assert(detail::rcutils_severity_warn == RCUTILS_LOG_SEVERITY_WARN);
+static_assert(detail::rcutils_severity_error == RCUTILS_LOG_SEVERITY_ERROR);
+static_assert(detail::rcutils_severity_fatal == RCUTILS_LOG_SEVERITY_FATAL);
 
 namespace
 {

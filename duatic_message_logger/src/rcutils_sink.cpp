@@ -33,21 +33,20 @@ namespace duatic::message_logger::detail
 {
 namespace
 {
-// rcutils severities, RCUTILS_LOG_SEVERITY_*
 int to_ros_severity(spdlog::level::level_enum level)
 {
   switch (level) {
     case spdlog::level::trace:
     case spdlog::level::debug:
-      return 10;
+      return rcutils_severity_debug;
     case spdlog::level::warn:
-      return 30;
+      return rcutils_severity_warn;
     case spdlog::level::err:
-      return 40;
+      return rcutils_severity_error;
     case spdlog::level::critical:
-      return 50;
+      return rcutils_severity_fatal;
     default:
-      return 20;
+      return rcutils_severity_info;
   }
 }
 
@@ -94,9 +93,9 @@ RcutilsSink::RcutilsSink() : stdout_(std::make_shared<spdlog::sinks::stdout_colo
 
 void RcutilsSink::resolve()
 {
-  auto* log = reinterpret_cast<LogFunction>(find_symbol("rcutils_log"));
-  auto* enabled = reinterpret_cast<EnabledFunction>(find_symbol("rcutils_logging_logger_is_enabled_for"));
-  auto* initialize = reinterpret_cast<InitializeFunction>(find_symbol("rcutils_logging_initialize"));
+  auto* log = reinterpret_cast<RcutilsLog>(find_symbol("rcutils_log"));
+  auto* enabled = reinterpret_cast<RcutilsIsEnabledFor>(find_symbol("rcutils_logging_logger_is_enabled_for"));
+  auto* initialize = reinterpret_cast<RcutilsInitialize>(find_symbol("rcutils_logging_initialize"));
   if (log == nullptr || enabled == nullptr || initialize == nullptr) {
     return;
   }
@@ -112,7 +111,11 @@ void RcutilsSink::sink_it_(const spdlog::details::log_msg& msg)
     return;
   }
   if (log_ == nullptr) {
-    resolve();
+    const auto now = std::chrono::steady_clock::now();
+    if (now >= next_lookup_) {
+      next_lookup_ = now + lookup_period;
+      resolve();
+    }
   }
   if (log_ == nullptr) {
     stdout_->log(msg);
@@ -125,9 +128,9 @@ void RcutilsSink::sink_it_(const spdlog::details::log_msg& msg)
     write_fallback(msg, name);
     return;
   }
-  const Location location{ msg.source.funcname != nullptr ? msg.source.funcname : "",
-                           msg.source.filename != nullptr ? msg.source.filename : "",
-                           static_cast<std::size_t>(msg.source.line > 0 ? msg.source.line : 0) };
+  const RcutilsLocation location{ msg.source.funcname != nullptr ? msg.source.funcname : "",
+                                  msg.source.filename != nullptr ? msg.source.filename : "",
+                                  static_cast<std::size_t>(msg.source.line > 0 ? msg.source.line : 0) };
   log_(&location, severity, name.c_str(), "%.*s", static_cast<int>(msg.payload.size()), msg.payload.data());
 }
 
