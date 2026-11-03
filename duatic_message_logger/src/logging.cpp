@@ -23,12 +23,10 @@
  */
 #include "duatic_message_logger/logging.hpp"
 
+#include "spdlog/sinks/dist_sink.h"
 #include "spdlog/sinks/sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
 
-#ifdef ENABLE_ROS2_LOGGING
-#include "duatic_message_logger/ros2_logger.hpp"
-#endif
+#include "duatic_message_logger/detail/rcutils_sink.hpp"
 
 namespace duatic::message_logger
 {
@@ -75,16 +73,19 @@ namespace
 {
 
 // The default sink and the default logger are created on first use and are deliberately never destroyed.
-// if rclcpp is found we default to the ros2 logging infrastructure, otherwise we use std::cout logging via
-// spdlog.
-spdlog::sink_ptr& default_sink()
+// The default sink forwards to ROS 2 logging when the process has it loaded, to stdout otherwise, until
+// set_default_sink() points it elsewhere.
+std::shared_ptr<spdlog::sinks::dist_sink_mt>& forwarding_sink()
 {
-#ifdef ENABLE_ROS2_LOGGING
-  static spdlog::sink_ptr& sink{ *new spdlog::sink_ptr{ std::make_shared<ROS2Sink>() } };
-#else
-  static spdlog::sink_ptr& sink{ *new spdlog::sink_ptr{ std::make_shared<spdlog::sinks::stdout_color_sink_mt>() } };
-#endif
+  static std::shared_ptr<spdlog::sinks::dist_sink_mt>& sink{ *new std::shared_ptr<spdlog::sinks::dist_sink_mt>{
+      std::make_shared<spdlog::sinks::dist_sink_mt>(
+          std::vector<spdlog::sink_ptr>{ std::make_shared<detail::RcutilsSink>() }) } };
   return sink;
+}
+
+spdlog::sink_ptr default_sink()
+{
+  return forwarding_sink();
 }
 
 Logger& default_logger()
@@ -143,6 +144,10 @@ Logger& get_default_logger()
 void configure_level(const LogLevel maximum_log_level)
 {
   default_sink()->set_level(convert_level(maximum_log_level));
+}
+void set_default_sink(spdlog::sink_ptr sink)
+{
+  forwarding_sink()->set_sinks({ std::move(sink) });
 }
 
 }  // namespace duatic::message_logger

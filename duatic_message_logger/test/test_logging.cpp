@@ -22,8 +22,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <gtest/gtest.h>
+
+#include <sstream>
+
 #include "duatic_message_logger/logging.hpp"
 
+#include "spdlog/sinks/ostream_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 TEST(Logging, DefaultOutput)
@@ -117,4 +121,18 @@ TEST(Logging, LoggerWithName)
 TEST(Logging, Simple)
 {
   logging::info() << "Test" << std::endl;
+}
+
+TEST(Logging, SetDefaultSinkRedirectsExistingLoggers)
+{
+  auto logger = duatic::message_logger::get_logger_with_default_sink("before_redirect");
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  sink->set_pattern("%n: %v");
+  duatic::message_logger::set_default_sink(sink);
+
+  duatic::message_logger::info(logger, "redirected {}", 1);
+  EXPECT_NE(out.str().find("before_redirect: redirected 1"), std::string::npos) << out.str();
+
+  duatic::message_logger::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 }
