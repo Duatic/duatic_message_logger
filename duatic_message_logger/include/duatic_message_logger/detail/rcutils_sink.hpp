@@ -33,39 +33,19 @@
 #include <string>
 #include <utility>
 
+#include <rcutils/logging.h>  // NOLINT(build/include_order)
+
 #include "spdlog/details/log_msg.h"
 #include "spdlog/sinks/base_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 namespace duatic::message_logger::detail
 {
-/// @name The parts of the rcutils logging C API used here, declared without its headers
-/// @note Checked against the rcutils headers at compile time in test_rcutils_detection
-/// @{
-
-/// @brief rcutils_log_location_t; the rosout handler reads it, so it is always passed
-struct RcutilsLocation
-{
-  const char* function_name;
-  const char* file_name;
-  std::size_t line_number;
-};
-
-using RcutilsLog = void (*)(const RcutilsLocation* location, int severity, const char* name, const char* format, ...);
-using RcutilsIsEnabledFor = bool (*)(const char* name, int severity);
-using RcutilsInitialize = int (*)();
-
-inline constexpr int rcutils_severity_debug = 10;  ///< RCUTILS_LOG_SEVERITY_DEBUG
-inline constexpr int rcutils_severity_info = 20;   ///< RCUTILS_LOG_SEVERITY_INFO
-inline constexpr int rcutils_severity_warn = 30;   ///< RCUTILS_LOG_SEVERITY_WARN
-inline constexpr int rcutils_severity_error = 40;  ///< RCUTILS_LOG_SEVERITY_ERROR
-inline constexpr int rcutils_severity_fatal = 50;  ///< RCUTILS_LOG_SEVERITY_FATAL
-/// @}
-
 /**
  * @brief Writes through the ROS 2 logging system when the process has it loaded, to stdout otherwise
  *
- * The rcutils C functions are looked up by name at runtime, so the logger has no build or link dependency on ROS.
+ * Built against the rcutils headers, but the functions are looked up by name at runtime, so the library neither links
+ * rcutils nor needs it installed.
  * Until they are found, the lookup is repeated at most once per lookup_period, so a process that loads ROS later
  * switches over.
  */
@@ -81,6 +61,10 @@ protected:
   void set_formatter_(std::unique_ptr<spdlog::formatter> sink_formatter) override;
 
 private:
+  using RcutilsLog = decltype(&rcutils_log);
+  using RcutilsIsEnabledFor = decltype(&rcutils_logging_logger_is_enabled_for);
+  using RcutilsInitialize = decltype(&rcutils_logging_initialize);
+
   static constexpr std::chrono::seconds lookup_period{ 1 };  ///< Spacing of lookups while rcutils is not found
 
   /// @brief Looks up the rcutils functions and initializes rcutils logging once they are found

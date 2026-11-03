@@ -15,6 +15,8 @@
 
   <depend>spdlog</depend>
   <depend>fmt</depend>
+  <!-- Headers only, rcutils is looked up at runtime and not needed by installs -->
+  <build_depend>rcutils</build_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

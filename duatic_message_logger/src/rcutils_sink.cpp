@@ -38,15 +38,15 @@ int to_ros_severity(spdlog::level::level_enum level)
   switch (level) {
     case spdlog::level::trace:
     case spdlog::level::debug:
-      return rcutils_severity_debug;
+      return RCUTILS_LOG_SEVERITY_DEBUG;
     case spdlog::level::warn:
-      return rcutils_severity_warn;
+      return RCUTILS_LOG_SEVERITY_WARN;
     case spdlog::level::err:
-      return rcutils_severity_error;
+      return RCUTILS_LOG_SEVERITY_ERROR;
     case spdlog::level::critical:
-      return rcutils_severity_fatal;
+      return RCUTILS_LOG_SEVERITY_FATAL;
     default:
-      return rcutils_severity_info;
+      return RCUTILS_LOG_SEVERITY_INFO;
   }
 }
 
@@ -135,9 +135,9 @@ void RcutilsSink::sink_it_(const spdlog::details::log_msg& msg)
     write_fallback(msg, name);
     return;
   }
-  const RcutilsLocation location{ msg.source.funcname != nullptr ? msg.source.funcname : "",
-                                  msg.source.filename != nullptr ? msg.source.filename : "",
-                                  static_cast<std::size_t>(msg.source.line > 0 ? msg.source.line : 0) };
+  const rcutils_log_location_t location{ msg.source.funcname != nullptr ? msg.source.funcname : "",
+                                         msg.source.filename != nullptr ? msg.source.filename : "",
+                                         static_cast<std::size_t>(msg.source.line > 0 ? msg.source.line : 0) };
   log_(&location, severity, name.c_str(), "%.*s", static_cast<int>(msg.payload.size()), msg.payload.data());
 }
 

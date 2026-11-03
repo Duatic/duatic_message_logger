@@ -8,6 +8,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
+find_package(rcutils REQUIRED)
 
 add_library(duatic_message_logger src/logging.cpp src/rcutils_sink.cpp)
 add_library(duatic_message_logger::duatic_message_logger ALIAS duatic_message_logger)
@@ -20,6 +21,9 @@ target_link_libraries(duatic_message_logger
   fmt::fmt
   ${CMAKE_DL_LIBS}
 )
+# rcutils headers only: its functions are looked up at runtime, so the library does not link it
+target_include_directories(duatic_message_logger SYSTEM PRIVATE
+  $<TARGET_PROPERTY:rcutils::rcutils,INTERFACE_INCLUDE_DIRECTORIES>)
 target_compile_options(duatic_message_logger PRIVATE
   -Wall
   -Wextra
@@ -63,11 +67,8 @@ if(BUILD_TESTING)
   )
 
   # Stands in for a ROS 2 process: rcutils is linked by the test, not by the library
-  find_package(rcutils QUIET)
-  if(rcutils_FOUND)
-    ament_add_gtest(test_rcutils_detection test/test_rcutils_detection.cpp)
-    target_link_libraries(test_rcutils_detection duatic_message_logger rcutils::rcutils)
-  endif()
+  ament_add_gtest(test_rcutils_detection test/test_rcutils_detection.cpp)
+  target_link_libraries(test_rcutils_detection duatic_message_logger rcutils::rcutils)
 endif()
 
 ament_export_include_directories(
