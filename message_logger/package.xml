@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>message_logger</name>
-  <version>0.0.0</version>
+  <version>1.0.0</version>
   <description>Compat package for the old MELO message logger</description>
   <maintainer email="lnachtigall@duatic.com">Lennart Nachtigall</maintainer>
   <license>BSD-3-Clause</license>
