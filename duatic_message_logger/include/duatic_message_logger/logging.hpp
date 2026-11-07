@@ -31,6 +31,8 @@
 
 #include <spdlog/spdlog.h>  // NOLINT(build/include_order)
 
+#include "duatic_message_logger/log_throttle.hpp"
+
 namespace duatic::message_logger
 {
 

@@ -136,3 +136,15 @@ TEST(Logging, SetDefaultSinkRedirectsExistingLoggers)
 
   duatic::message_logger::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 }
+
+TEST(Logging, LogThrottleLetsTheFirstMessageThroughThenOnePerPeriod)
+{
+  const logging::LogThrottle::Clock::time_point start{};
+  const std::chrono::milliseconds ms{ 1 };
+  logging::LogThrottle throttle{ 1000 * ms };
+  EXPECT_TRUE(throttle.ready(start));
+  EXPECT_FALSE(throttle.ready(start + 999 * ms));
+  EXPECT_TRUE(throttle.ready(start + 1000 * ms));
+  EXPECT_FALSE(throttle.ready(start + 1500 * ms));
+  EXPECT_TRUE(throttle.ready(start + 2500 * ms));
+}

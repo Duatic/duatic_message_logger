@@ -100,7 +100,23 @@ See [fmt](https://github.com/fmtlib/fmt) for all formatting options
   logging::fatal(logger, "Fatal {}", 1);
 ```
 
-## 5. Old MELO style api
+## 5. Throttled messages
+
+A `LogThrottle` lets a repeated message through at most once per period, on the time passed to it. Keep one per message.
+
+```c++
+#include "duatic_message_logger/log.hpp"
+
+...
+logging::LogThrottle no_reply_log{ std::chrono::seconds(5) };
+
+...
+if (no_reply_log.ready(std::chrono::steady_clock::now())) {
+  logging::warning("No reply from {}", name);
+}
+```
+
+## 6. Old MELO style api
 
 Do not use this - this is for compatibility only.
 The `message_logger` packet is implemented as drop in replacement.
@@ -114,7 +130,7 @@ MELO_INFO("{}", 1);
 MELO_INFO_STREAM("ABC" << 1);
 ```
 
-## 6. Explicit namespace
+## 7. Explicit namespace
 
 Use this in case the `logging` namespace is too general for you
 
@@ -128,7 +144,7 @@ duatic::message_logger::debug("Debug {}", 1);
 
 ```
 
-## 7. ROS 2
+## 8. ROS 2
 
 The logger has no runtime ROS dependency. In a process that has ROS 2 loaded, the default sink writes through the
 ROS 2 logging system (rcutils), so messages appear in the console and in `/rosout` like any ROS log, with no setup in
