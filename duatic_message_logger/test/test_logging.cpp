@@ -137,14 +137,18 @@ TEST(Logging, SetDefaultSinkRedirectsExistingLoggers)
   duatic::message_logger::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 }
 
-TEST(Logging, LogThrottleLetsTheFirstMessageThroughThenOnePerPeriod)
+TEST(Logging, ThrottledMessageGoesOutFirstThenOncePerPeriod)
 {
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  sink->set_pattern("%v");
+  spdlog::logger logger{ "throttled", sink };
+
   const logging::LogThrottle::Clock::time_point start{};
   const std::chrono::milliseconds ms{ 1 };
   logging::LogThrottle throttle{ 1000 * ms };
-  EXPECT_TRUE(throttle.ready(start));
-  EXPECT_FALSE(throttle.ready(start + 999 * ms));
-  EXPECT_TRUE(throttle.ready(start + 1000 * ms));
-  EXPECT_FALSE(throttle.ready(start + 1500 * ms));
-  EXPECT_TRUE(throttle.ready(start + 2500 * ms));
+  for (const auto t : { 0, 999, 1000, 1500, 2500 }) {
+    logging::warning(throttle, start + t * ms, logger, "at {}", t);
+  }
+  EXPECT_EQ(out.str(), "at 0\nat 1000\nat 2500\n");
 }

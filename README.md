@@ -102,7 +102,7 @@ See [fmt](https://github.com/fmtlib/fmt) for all formatting options
 
 ## 5. Throttled messages
 
-A `LogThrottle` lets a repeated message through at most once per period, on the time passed to it. Keep one per message.
+Each fmt style call also takes a `LogThrottle` and the current time. The message is formatted and logged only on the first call and then at most once per period. Keep one throttle per message.
 
 ```c++
 #include "duatic_message_logger/log.hpp"
@@ -111,9 +111,7 @@ A `LogThrottle` lets a repeated message through at most once per period, on the 
 logging::LogThrottle no_reply_log{ std::chrono::seconds(5) };
 
 ...
-if (no_reply_log.ready(std::chrono::steady_clock::now())) {
-  logging::warning("No reply from {}", name);
-}
+logging::warning(no_reply_log, std::chrono::steady_clock::now(), logger, "No reply from {}", name);
 ```
 
 ## 6. Old MELO style api
