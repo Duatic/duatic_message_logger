@@ -23,6 +23,7 @@
  */
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <utility>
 #include <memory>
@@ -52,6 +53,61 @@ enum class LogLevel
 [[nodiscard]] std::optional<LogLevel> parse_level_from_string(std::string_view text) noexcept;
 
 std::ostream& operator<<(std::ostream& os, const LogLevel level);
+
+/**
+ * @brief Lets a repeated message through at most once per period, on the time passed to the throttled log calls.
+ *
+ * Keep one per message, and one per object when several objects log the same message.
+ *
+ * @note Not thread safe.
+ */
+class LogThrottle
+{
+public:
+  using Clock = std::chrono::steady_clock;  ///< Clock of the times passed to the throttled log calls.
+
+  /**
+   * @brief Creates a throttle that lets the first message through.
+   * @param period Minimum time between two messages.
+   */
+  explicit LogThrottle(std::chrono::nanoseconds period) noexcept : period_(period)
+  {
+  }
+
+private:
+  template <typename... Args>
+  friend void log(LogThrottle& throttle, Clock::time_point now, Logger& logger, LogLevel level,
+                  fmt::format_string<Args...> fmt, Args&&... args);
+
+  /// @brief Returns true on the first call and once the period has passed, and then starts a new period.
+  [[nodiscard]] bool ready(Clock::time_point now) noexcept
+  {
+    if (now < next_) {
+      return false;
+    }
+    next_ = now + period_;
+    return true;
+  }
+
+  std::chrono::nanoseconds period_;
+  Clock::time_point next_{ Clock::time_point::min() };  ///< Earliest time the next message passes
+};
+
+/**
+ * @brief Lets a message through only the first time it is logged.
+ *
+ * Keep one per message, and one per object when several objects log the same message.
+ *
+ * @note Not thread safe.
+ */
+class LogOnce
+{
+private:
+  template <typename... Args>
+  friend void log(LogOnce& once, Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args);
+
+  bool logged_{ false };
+};
 
 /**
  * @brief obtain the currently configured default logger
@@ -179,6 +235,81 @@ template <typename... Args>
 inline void fatal(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
+}
+
+// throttled fmt style api: formats and logs only when the throttle lets the message through
+template <typename... Args>
+inline void log(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger, LogLevel level,
+                fmt::format_string<Args...> fmt, Args&&... args)
+{
+  if (throttle.ready(now)) {
+    log(logger, level, fmt, std::forward<Args>(args)...);
+  }
+}
+template <typename... Args>
+inline void debug(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+                  fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(throttle, now, logger, LogLevel::Debug, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void info(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+                 fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(throttle, now, logger, LogLevel::Info, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void warning(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+                    fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(throttle, now, logger, LogLevel::Warning, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void error(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+                  fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(throttle, now, logger, LogLevel::Error, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void fatal(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+                  fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(throttle, now, logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
+}
+
+// log once fmt style api: formats and logs only the first call
+template <typename... Args>
+inline void log(LogOnce& once, Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  if (!once.logged_) {
+    once.logged_ = true;
+    log(logger, level, fmt, std::forward<Args>(args)...);
+  }
+}
+template <typename... Args>
+inline void debug(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Debug, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void info(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Info, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void warning(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Warning, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void error(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Error, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void fatal(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
 
 // stream style api

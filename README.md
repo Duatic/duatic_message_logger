@@ -100,7 +100,30 @@ See [fmt](https://github.com/fmtlib/fmt) for all formatting options
   logging::fatal(logger, "Fatal {}", 1);
 ```
 
-## 5. Old MELO style api
+## 5. Throttled and one time messages
+
+Each fmt style call also takes a `LogThrottle` and the current time. The message is formatted and logged only on the first call and then at most once per period. Keep one throttle per message.
+
+```c++
+#include "duatic_message_logger/log.hpp"
+
+...
+logging::LogThrottle no_reply_log{ std::chrono::seconds(5) };
+
+...
+logging::warning(no_reply_log, std::chrono::steady_clock::now(), logger, "No reply from {}", name);
+```
+
+A `LogOnce` lets a message through only the first time.
+
+```c++
+logging::LogOnce no_zero_log;
+
+...
+logging::warning(no_zero_log, logger, "{} has no stored zero", name);
+```
+
+## 6. Old MELO style api
 
 Do not use this - this is for compatibility only.
 The `message_logger` packet is implemented as drop in replacement.
@@ -114,7 +137,7 @@ MELO_INFO("{}", 1);
 MELO_INFO_STREAM("ABC" << 1);
 ```
 
-## 6. Explicit namespace
+## 7. Explicit namespace
 
 Use this in case the `logging` namespace is too general for you
 
@@ -128,7 +151,7 @@ duatic::message_logger::debug("Debug {}", 1);
 
 ```
 
-## 7. ROS 2
+## 8. ROS 2
 
 The logger has no runtime ROS dependency. In a process that has ROS 2 loaded, the default sink writes through the
 ROS 2 logging system (rcutils), so messages appear in the console and in `/rosout` like any ROS log, with no setup in
