@@ -152,3 +152,17 @@ TEST(Logging, ThrottledMessageGoesOutFirstThenOncePerPeriod)
   }
   EXPECT_EQ(out.str(), "at 0\nat 1000\nat 2500\n");
 }
+
+TEST(Logging, LogOnceMessageGoesOutOnlyOnce)
+{
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  sink->set_pattern("%v");
+  spdlog::logger logger{ "once", sink };
+
+  logging::LogOnce once;
+  for (const auto i : { 0, 1, 2 }) {
+    logging::warning(once, logger, "call {}", i);
+  }
+  EXPECT_EQ(out.str(), "call 0\n");
+}

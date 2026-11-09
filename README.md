@@ -100,7 +100,7 @@ See [fmt](https://github.com/fmtlib/fmt) for all formatting options
   logging::fatal(logger, "Fatal {}", 1);
 ```
 
-## 5. Throttled messages
+## 5. Throttled and one time messages
 
 Each fmt style call also takes a `LogThrottle` and the current time. The message is formatted and logged only on the first call and then at most once per period. Keep one throttle per message.
 
@@ -112,6 +112,15 @@ logging::LogThrottle no_reply_log{ std::chrono::seconds(5) };
 
 ...
 logging::warning(no_reply_log, std::chrono::steady_clock::now(), logger, "No reply from {}", name);
+```
+
+A `LogOnce` lets a message through only the first time.
+
+```c++
+logging::LogOnce no_zero_log;
+
+...
+logging::warning(no_zero_log, logger, "{} has no stored zero", name);
 ```
 
 ## 6. Old MELO style api

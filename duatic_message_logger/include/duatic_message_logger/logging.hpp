@@ -94,6 +94,22 @@ private:
 };
 
 /**
+ * @brief Lets a message through only the first time it is logged.
+ *
+ * Keep one per message, and one per object when several objects log the same message.
+ *
+ * @note Not thread safe.
+ */
+class LogOnce
+{
+private:
+  template <typename... Args>
+  friend void log(LogOnce& once, Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args);
+
+  bool logged_{ false };
+};
+
+/**
  * @brief obtain the currently configured default logger
  */
 Logger& get_default_logger();
@@ -259,6 +275,41 @@ inline void fatal(LogThrottle& throttle, LogThrottle::Clock::time_point now, Log
                   fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(throttle, now, logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
+}
+
+// log once fmt style api: formats and logs only the first call
+template <typename... Args>
+inline void log(LogOnce& once, Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  if (!once.logged_) {
+    once.logged_ = true;
+    log(logger, level, fmt, std::forward<Args>(args)...);
+  }
+}
+template <typename... Args>
+inline void debug(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Debug, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void info(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Info, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void warning(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Warning, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void error(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Error, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void fatal(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+{
+  log(once, logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
 
 // stream style api
