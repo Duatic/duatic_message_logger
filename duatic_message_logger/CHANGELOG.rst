@@ -16,7 +16,6 @@ Forthcoming
 * fix: once and throttled messages below the logger's level no longer use up their slot
 * fix: stream style calls below the logger's level no longer format their arguments
 * deprecate get_logger_with_default_sink (use get_logger) and configure_level (use set_level(Default, level))
-* drop ROS 2 Humble support
 
 2.0.0 (2026-11-04)
 ------------------
