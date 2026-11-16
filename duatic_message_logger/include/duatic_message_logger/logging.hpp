@@ -387,7 +387,20 @@ void configure_level(const LogLevel maximum_log_level);
  * @brief route everything written to the default sink to another sink
  * @note by default it goes to ROS 2 logging when the process has rcutils loaded, to stdout otherwise
  * @note applies to loggers created before the call as well, they keep the default sink but it forwards elsewhere
+ * @note replaces all sinks the default sink forwards to, including those added with add_default_sink()
  */
 void set_default_sink(spdlog::sink_ptr sink);
+
+/**
+ * @brief also forward everything written to the default sink to another sink, in addition to the current ones
+ * @note applies to loggers created before the call as well
+ * @note the added sink filters with its own level
+ */
+void add_default_sink(spdlog::sink_ptr sink);
+
+/**
+ * @brief stop forwarding to a sink added with add_default_sink()
+ */
+void remove_default_sink(const spdlog::sink_ptr& sink);
 
 }  // namespace duatic::message_logger

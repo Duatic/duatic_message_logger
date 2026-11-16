@@ -137,6 +137,36 @@ TEST(Logging, SetDefaultSinkRedirectsExistingLoggers)
   duatic::message_logger::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 }
 
+TEST(Logging, AddDefaultSinkReceivesRecordsOfNamedLoggers)
+{
+  auto logger = duatic::message_logger::get_logger_with_default_sink("before_add");
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  sink->set_pattern("%n: %v");
+  duatic::message_logger::add_default_sink(sink);
+
+  auto later_logger = duatic::message_logger::get_logger_with_default_sink("after_add");
+
+  duatic::message_logger::info(logger, "named {}", 1);
+  duatic::message_logger::info(later_logger, "named {}", 2);
+  EXPECT_NE(out.str().find("before_add: named 1"), std::string::npos) << out.str();
+  EXPECT_NE(out.str().find("after_add: named 2"), std::string::npos) << out.str();
+
+  duatic::message_logger::remove_default_sink(sink);
+}
+
+TEST(Logging, RemoveDefaultSinkStopsDelivery)
+{
+  auto logger = duatic::message_logger::get_logger_with_default_sink("removed");
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  duatic::message_logger::add_default_sink(sink);
+  duatic::message_logger::remove_default_sink(sink);
+
+  duatic::message_logger::info(logger, "not delivered");
+  EXPECT_TRUE(out.str().empty()) << out.str();
+}
+
 TEST(Logging, ThrottledMessageGoesOutFirstThenOncePerPeriod)
 {
   std::ostringstream out;
