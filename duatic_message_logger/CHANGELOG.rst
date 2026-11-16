@@ -2,6 +2,22 @@
 Changelog for package duatic_message_logger
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* feat!: Logger is a handle onto a logger; get_logger(name) returns the registered logger of that name, and copies share it
+* feat!: duatic_message_logger alone decides the levels of its loggers: set_level / reset_level / get_level /
+  get_effective_level by name (hierarchical, as in ROS 2) or for logging::Default; ROS levels no longer filter them
+* feat!: records go straight to the ROS 2 logging output, so records ROS used to filter by level now reach its
+  console and log file too
+* feat: attach_sink / detach_sink forward records to additional sinks; set_default_sink replaces only the output
+* feat: log_levels lists all levels and to_string(LogLevel) gives the names parse_level_from_string accepts
+* feat: parse_level_from_string accepts "warn"
+* fix: configure_level / set_level now enable debug output; loggers no longer stay at info
+* fix: once and throttled messages below the logger's level no longer use up their slot
+* fix: stream style calls below the logger's level no longer format their arguments
+* deprecate get_logger_with_default_sink (use get_logger) and configure_level (use set_level(Default, level))
+* drop ROS 2 Humble support
+
 2.0.0 (2026-11-04)
 ------------------
 * feat!: drop the rclcpp dependency, detect ROS 2 logging at runtime (#15)

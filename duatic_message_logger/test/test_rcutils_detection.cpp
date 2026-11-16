@@ -23,6 +23,7 @@
  */
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <string>
@@ -34,11 +35,17 @@
 
 namespace
 {
-std::vector<std::string> messages;
+struct Record
+{
+  std::string text;  ///< "<name>: <message>"
+  int severity;
+  rcutils_time_point_value_t timestamp;
+};
+std::vector<Record> records;
 
 // Fails on a missing location, as the rosout handler of a ROS 2 node would crash on it
-void capture(const rcutils_log_location_t* location, int /*severity*/, const char* name,
-             rcutils_time_point_value_t /*timestamp*/, const char* format, va_list* args)
+void capture(const rcutils_log_location_t* location, int severity, const char* name,
+             rcutils_time_point_value_t timestamp, const char* format, va_list* args)
 {
   ASSERT_NE(location, nullptr);
   char buffer[256];
@@ -46,19 +53,64 @@ void capture(const rcutils_log_location_t* location, int /*severity*/, const cha
   va_copy(copy, *args);
   std::vsnprintf(buffer, sizeof(buffer), format, copy);
   va_end(copy);
-  messages.push_back(std::string(name) + ": " + buffer);
+  records.push_back({ std::string(name) + ": " + buffer, severity, timestamp });
 }
+
+class RcutilsDetection : public ::testing::Test
+{
+protected:
+  void SetUp() override
+  {
+    ASSERT_EQ(rcutils_logging_initialize(), RCUTILS_RET_OK);
+    rcutils_logging_set_output_handler(capture);
+    records.clear();
+  }
+};
 }  // namespace
 
 // The test links rcutils, as a ROS 2 process does; the logger itself does not
-TEST(RcutilsDetection, DefaultSinkWritesThroughRcutils)
+TEST_F(RcutilsDetection, DefaultSinkWritesThroughRcutils)
 {
-  auto logger = duatic::message_logger::get_logger_with_default_sink("detected");
-  ASSERT_EQ(rcutils_logging_initialize(), RCUTILS_RET_OK);
-  rcutils_logging_set_output_handler(capture);
+  auto logger = duatic::message_logger::get_logger("detected");
+  const auto before = std::chrono::system_clock::now();
 
   duatic::message_logger::info(logger, "hello {}", 1);
 
-  ASSERT_FALSE(messages.empty());
-  EXPECT_EQ(messages.back(), "detected: hello 1");
+  ASSERT_FALSE(records.empty());
+  EXPECT_EQ(records.back().text, "detected: hello 1");
+  EXPECT_EQ(records.back().severity, RCUTILS_LOG_SEVERITY_INFO);
+  const auto since_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(before.time_since_epoch()).count();
+  EXPECT_GE(records.back().timestamp, since_epoch);
+}
+
+// ROS only handles its own loggers: its levels neither drop our records nor change through our level settings
+TEST_F(RcutilsDetection, RosLevelsDoNotFilterOurLoggers)
+{
+  auto logger = duatic::message_logger::get_logger("ros_filtered");
+  ASSERT_EQ(rcutils_logging_set_logger_level("ros_filtered", RCUTILS_LOG_SEVERITY_ERROR), RCUTILS_RET_OK);
+
+  duatic::message_logger::info(logger, "still delivered");
+  ASSERT_FALSE(records.empty());
+  EXPECT_EQ(records.back().text, "ros_filtered: still delivered");
+
+  duatic::message_logger::set_level("ros_filtered", duatic::message_logger::LogLevel::Debug);
+  EXPECT_EQ(rcutils_logging_get_logger_level("ros_filtered"), RCUTILS_LOG_SEVERITY_ERROR);
+  duatic::message_logger::debug(logger, "debug delivered");
+  EXPECT_EQ(records.back().text, "ros_filtered: debug delivered");
+  EXPECT_EQ(records.back().severity, RCUTILS_LOG_SEVERITY_DEBUG);
+  duatic::message_logger::reset_level("ros_filtered");
+}
+
+// A record logged after rcutils logging was shut down is still printed, not rejected by the console handler
+TEST_F(RcutilsDetection, RecordAfterShutdownInitializesAgain)
+{
+  auto logger = duatic::message_logger::get_logger("after_shutdown");
+  ASSERT_EQ(rcutils_logging_shutdown(), RCUTILS_RET_OK);
+
+  testing::internal::CaptureStderr();
+  duatic::message_logger::info(logger, "still printed");
+  const std::string output = testing::internal::GetCapturedStderr();
+
+  EXPECT_NE(output.find("still printed"), std::string::npos) << output;
+  EXPECT_EQ(output.find("isn't initialized"), std::string::npos) << output;
 }

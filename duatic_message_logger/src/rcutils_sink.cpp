@@ -23,7 +23,7 @@
  */
 #include "duatic_message_logger/detail/rcutils_sink.hpp"
 
-#include <cinttypes>
+#include <cstdarg>
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <dlfcn.h>
@@ -50,21 +50,16 @@ int to_ros_severity(spdlog::level::level_enum level)
   }
 }
 
-const char* to_ros_severity_name(spdlog::level::level_enum level)
+// Builds the va_list the output handler takes; the format attribute lets -Wformat check the calls
+[[gnu::format(printf, 6, 7)]] void call_output_handler(rcutils_logging_output_handler_t handler,
+                                                       const rcutils_log_location_t* location, int severity,
+                                                       const char* name, rcutils_time_point_value_t timestamp,
+                                                       const char* format, ...)
 {
-  switch (level) {
-    case spdlog::level::trace:
-    case spdlog::level::debug:
-      return "DEBUG";
-    case spdlog::level::warn:
-      return "WARN";
-    case spdlog::level::err:
-      return "ERROR";
-    case spdlog::level::critical:
-      return "FATAL";
-    default:
-      return "INFO";
-  }
+  va_list args;
+  va_start(args, format);
+  handler(location, severity, name, timestamp, format, &args);
+  va_end(args);
 }
 
 // Same stream as rcutils
@@ -100,16 +95,14 @@ RcutilsSink::RcutilsSink() : stdout_(std::make_shared<spdlog::sinks::stdout_colo
 
 void RcutilsSink::resolve()
 {
-  auto* log = reinterpret_cast<RcutilsLog>(find_symbol("rcutils_log"));
-  auto* enabled = reinterpret_cast<RcutilsIsEnabledFor>(find_symbol("rcutils_logging_logger_is_enabled_for"));
+  auto* get_handler = reinterpret_cast<RcutilsGetOutputHandler>(find_symbol("rcutils_logging_get_output_handler"));
   auto* initialize = reinterpret_cast<RcutilsInitialize>(find_symbol("rcutils_logging_initialize"));
-  if (log == nullptr || enabled == nullptr || initialize == nullptr) {
+  if (get_handler == nullptr || initialize == nullptr) {
     return;
   }
   // Returns early when rcutils logging is already initialized
   initialize();
-  log_ = log;
-  enabled_ = enabled;
+  get_output_handler_ = get_handler;
 }
 
 void RcutilsSink::sink_it_(const spdlog::details::log_msg& msg)
@@ -117,28 +110,27 @@ void RcutilsSink::sink_it_(const spdlog::details::log_msg& msg)
   if (msg.level == spdlog::level::off) {
     return;
   }
-  if (log_ == nullptr) {
+  if (get_output_handler_ == nullptr) {
     const auto now = std::chrono::steady_clock::now();
     if (now >= next_lookup_) {
       next_lookup_ = now + lookup_period;
       resolve();
     }
   }
-  if (log_ == nullptr) {
+  const rcutils_logging_output_handler_t handler = get_output_handler_ != nullptr ? get_output_handler_() : nullptr;
+  if (handler == nullptr) {
     stdout_->log(msg);
     return;
   }
+  // The logger's level already decided, so this skips the level check rcutils_log would do
   const std::string name(msg.logger_name.begin(), msg.logger_name.end());
-  const int severity = to_ros_severity(msg.level);
-  if (!enabled_(name.c_str(), severity)) {
-    // The logger's own level let it through, so it is shown even where ROS filters it
-    write_fallback(msg, name);
-    return;
-  }
   const rcutils_log_location_t location{ msg.source.funcname != nullptr ? msg.source.funcname : "",
                                          msg.source.filename != nullptr ? msg.source.filename : "",
                                          static_cast<std::size_t>(msg.source.line > 0 ? msg.source.line : 0) };
-  log_(&location, severity, name.c_str(), "%.*s", static_cast<int>(msg.payload.size()), msg.payload.data());
+  const auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(msg.time.time_since_epoch()).count();
+  call_output_handler(handler, &location, to_ros_severity(msg.level), name.c_str(),
+                      static_cast<rcutils_time_point_value_t>(timestamp), "%.*s", static_cast<int>(msg.payload.size()),
+                      msg.payload.data());
 }
 
 void RcutilsSink::flush_()
@@ -155,19 +147,6 @@ void RcutilsSink::set_pattern_(const std::string& pattern)
 void RcutilsSink::set_formatter_(std::unique_ptr<spdlog::formatter> sink_formatter)
 {
   stdout_->set_formatter(std::move(sink_formatter));
-}
-
-// Mirrors the rcutils default console layout: [{severity}] [{seconds}.{nanoseconds}] [{name}]: {message}
-void RcutilsSink::write_fallback(const spdlog::details::log_msg& msg, const std::string& name)
-{
-  const auto since_epoch = msg.time.time_since_epoch();
-  const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(since_epoch);
-  const auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(since_epoch - seconds);
-  std::FILE* stream = output_stream();
-  std::fprintf(stream, "[%s] [%" PRId64 ".%09" PRId64 "] [%s]: %.*s\n", to_ros_severity_name(msg.level),
-               static_cast<std::int64_t>(seconds.count()), static_cast<std::int64_t>(nanos.count()), name.c_str(),
-               static_cast<int>(msg.payload.size()), msg.payload.data());
-  std::fflush(stream);
 }
 
 }  // namespace duatic::message_logger::detail

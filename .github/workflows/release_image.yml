@@ -7,7 +7,7 @@ on:
         description: "ROS distro to release"
         required: true
         type: choice
-        options: [humble, jazzy, kilted, lyrical, rolling]
+        options: [jazzy, kilted, lyrical, rolling]
       version:
         description: "Version to tag (e.g. 1.0.0); must not already exist"
         required: true

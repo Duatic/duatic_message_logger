@@ -24,6 +24,7 @@
 #include <gtest/gtest.h>
 
 #include <sstream>
+#include <stdexcept>
 
 #include "duatic_message_logger/logging.hpp"
 
@@ -63,7 +64,7 @@ TEST(Logging, StandardOut)
   // %Y-%m-%d %H:%M:%S.%f = timestamp with microseconds
   sink->set_color_mode(spdlog::color_mode::always);
   sink->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
-  spdlog::logger logger{ "test", sink };
+  const duatic::message_logger::Logger logger{ std::make_shared<spdlog::logger>("test", sink) };
   duatic::message_logger::configure_logger(logger);
 
   duatic::message_logger::debug() << "Test debug"
@@ -87,7 +88,7 @@ TEST(Logging, ExplicitLogger)
   // %Y-%m-%d %H:%M:%S.%f = timestamp with microseconds
   sink->set_color_mode(spdlog::color_mode::always);
   sink->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
-  spdlog::logger logger{ "custom", sink };
+  const duatic::message_logger::Logger logger{ std::make_shared<spdlog::logger>("custom", sink) };
 
   // ftm style
   duatic::message_logger::debug(logger, "Debug {}", 1);
@@ -106,7 +107,7 @@ TEST(Logging, ExplicitLogger)
 }
 TEST(Logging, LoggerWithName)
 {
-  auto logger = duatic::message_logger::get_logger_with_default_sink("test_with_name");
+  auto logger = duatic::message_logger::get_logger("test_with_name");
 
   duatic::message_logger::debug(logger) << "Test debug" << logger.name() << std::endl;
   duatic::message_logger::info(logger) << "Test info " << logger.name();
@@ -123,48 +124,252 @@ TEST(Logging, Simple)
   logging::info() << "Test" << std::endl;
 }
 
+namespace
+{
+// Records everything written to the default sink as "<logger> <level>: <message>" lines, while it lives
+class Capture
+{
+public:
+  Capture() : sink_(std::make_shared<spdlog::sinks::ostream_sink_mt>(out_))
+  {
+    sink_->set_pattern("%n %l: %v");
+    logging::attach_sink(sink_);
+  }
+  ~Capture()
+  {
+    logging::detach_sink(sink_);
+  }
+  Capture(const Capture&) = delete;
+  Capture& operator=(const Capture&) = delete;
+
+  [[nodiscard]] std::string str() const
+  {
+    return out_.str();
+  }
+  [[nodiscard]] bool contains(const std::string& text) const
+  {
+    return out_.str().find(text) != std::string::npos;
+  }
+
+private:
+  std::ostringstream out_;
+  std::shared_ptr<spdlog::sinks::ostream_sink_mt> sink_;
+};
+
+// Counts how often it is streamed
+struct Counted
+{
+  int* calls;
+};
+std::ostream& operator<<(std::ostream& os, const Counted& counted)
+{
+  ++*counted.calls;
+  return os;
+}
+}  // namespace
+
 TEST(Logging, SetDefaultSinkRedirectsExistingLoggers)
 {
-  auto logger = duatic::message_logger::get_logger_with_default_sink("before_redirect");
+  auto logger = logging::get_logger("before_redirect");
   std::ostringstream out;
   auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
   sink->set_pattern("%n: %v");
-  duatic::message_logger::set_default_sink(sink);
+  logging::set_default_sink(sink);
 
-  duatic::message_logger::info(logger, "redirected {}", 1);
+  logging::info(logger, "redirected {}", 1);
   EXPECT_NE(out.str().find("before_redirect: redirected 1"), std::string::npos) << out.str();
 
-  duatic::message_logger::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+  logging::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 }
 
-TEST(Logging, AddDefaultSinkReceivesRecordsOfNamedLoggers)
+TEST(Logging, SetDefaultSinkKeepsAttachedSinks)
 {
-  auto logger = duatic::message_logger::get_logger_with_default_sink("before_add");
+  auto logger = logging::get_logger("kept_attached");
+  const Capture capture;
   std::ostringstream out;
-  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
-  sink->set_pattern("%n: %v");
-  duatic::message_logger::add_default_sink(sink);
+  logging::set_default_sink(std::make_shared<spdlog::sinks::ostream_sink_mt>(out));
 
-  auto later_logger = duatic::message_logger::get_logger_with_default_sink("after_add");
+  logging::info(logger, "still attached");
+  EXPECT_TRUE(capture.contains("kept_attached info: still attached")) << capture.str();
+  EXPECT_NE(out.str().find("still attached"), std::string::npos) << out.str();
 
-  duatic::message_logger::info(logger, "named {}", 1);
-  duatic::message_logger::info(later_logger, "named {}", 2);
-  EXPECT_NE(out.str().find("before_add: named 1"), std::string::npos) << out.str();
-  EXPECT_NE(out.str().find("after_add: named 2"), std::string::npos) << out.str();
-
-  duatic::message_logger::remove_default_sink(sink);
+  logging::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 }
 
-TEST(Logging, RemoveDefaultSinkStopsDelivery)
+TEST(Logging, AttachSinkReceivesRecordsOfRegisteredLoggers)
 {
-  auto logger = duatic::message_logger::get_logger_with_default_sink("removed");
+  auto logger = logging::get_logger("before_attach");
+  const Capture capture;
+  auto later_logger = logging::get_logger("after_attach");
+
+  logging::info(logger, "named {}", 1);
+  logging::info(later_logger, "named {}", 2);
+  EXPECT_TRUE(capture.contains("before_attach info: named 1")) << capture.str();
+  EXPECT_TRUE(capture.contains("after_attach info: named 2")) << capture.str();
+}
+
+TEST(Logging, AttachingTwiceDeliversOnce)
+{
+  auto logger = logging::get_logger("attached_twice");
   std::ostringstream out;
   auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
-  duatic::message_logger::add_default_sink(sink);
-  duatic::message_logger::remove_default_sink(sink);
+  sink->set_pattern("%v");
+  logging::attach_sink(sink);
+  logging::attach_sink(sink);
 
-  duatic::message_logger::info(logger, "not delivered");
+  logging::info(logger, "once");
+  EXPECT_EQ(out.str(), "once\n");
+
+  logging::detach_sink(sink);
+}
+
+TEST(Logging, DetachSinkStopsDelivery)
+{
+  auto logger = logging::get_logger("detached");
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  logging::attach_sink(sink);
+  logging::detach_sink(sink);
+  EXPECT_NO_THROW(logging::detach_sink(sink));
+
+  logging::info(logger, "not delivered");
   EXPECT_TRUE(out.str().empty()) << out.str();
+}
+
+TEST(Logging, DefaultLevelAppliesToExistingLoggers)
+{
+  auto logger = logging::get_logger("default_level");
+  EXPECT_FALSE(logging::get_level(logging::Default).has_value());
+  EXPECT_EQ(logging::get_effective_level(logging::Default), logging::LogLevel::Info);
+  EXPECT_FALSE(logger.should_log(logging::LogLevel::Debug));
+
+  logging::set_level(logging::Default, logging::LogLevel::Debug);
+  EXPECT_EQ(logging::get_level(logging::Default), logging::LogLevel::Debug);
+  EXPECT_TRUE(logger.should_log(logging::LogLevel::Debug));
+  {
+    const Capture capture;
+    logging::debug(logger, "now visible");
+    EXPECT_TRUE(capture.contains("default_level debug: now visible")) << capture.str();
+  }
+
+  logging::reset_level(logging::Default);
+  EXPECT_EQ(logging::get_effective_level(logging::Default), logging::LogLevel::Info);
+  EXPECT_FALSE(logger.should_log(logging::LogLevel::Debug));
+}
+
+TEST(Logging, NameSettingCoversNamesBelowIt)
+{
+  auto parent = logging::get_logger("hier");
+  auto child = logging::get_logger("hier.child");
+  auto sibling = logging::get_logger("hierx");
+
+  logging::set_level("hier", logging::LogLevel::Debug);
+  EXPECT_TRUE(parent.should_log(logging::LogLevel::Debug));
+  EXPECT_TRUE(child.should_log(logging::LogLevel::Debug));
+  EXPECT_FALSE(sibling.should_log(logging::LogLevel::Debug));
+  EXPECT_EQ(logging::get_effective_level("hier.child.grandchild"), logging::LogLevel::Debug);
+
+  logging::set_level("hier.child", logging::LogLevel::Warning);
+  EXPECT_FALSE(child.should_log(logging::LogLevel::Info));
+  EXPECT_TRUE(parent.should_log(logging::LogLevel::Debug));
+  EXPECT_EQ(logging::get_level("hier.child"), logging::LogLevel::Warning);
+
+  logging::reset_level("hier.child");
+  EXPECT_FALSE(logging::get_level("hier.child").has_value());
+  EXPECT_TRUE(child.should_log(logging::LogLevel::Debug));
+
+  logging::reset_level("hier");
+  EXPECT_FALSE(child.should_log(logging::LogLevel::Debug));
+}
+
+TEST(Logging, NameSettingAppliesToLoggersCreatedLater)
+{
+  logging::set_level("created_later", logging::LogLevel::Error);
+  auto logger = logging::get_logger("created_later");
+  EXPECT_FALSE(logger.should_log(logging::LogLevel::Warning));
+  EXPECT_TRUE(logger.should_log(logging::LogLevel::Error));
+  logging::reset_level("created_later");
+}
+
+TEST(Logging, DefaultLevelIsNotTheDefaultLoggersLevel)
+{
+  logging::set_level("global_logger", logging::LogLevel::Warning);
+  logging::set_level(logging::Default, logging::LogLevel::Debug);
+  EXPECT_EQ(logging::get_effective_level("global_logger"), logging::LogLevel::Warning);
+  logging::reset_level(logging::Default);
+  logging::reset_level("global_logger");
+}
+
+TEST(Logging, HandlesOfOneNameShareTheirLevel)
+{
+  auto first = logging::get_logger("shared");
+  auto second = logging::get_logger("shared");
+  logging::set_level("shared", logging::LogLevel::Debug);
+  EXPECT_TRUE(first.should_log(logging::LogLevel::Debug));
+  EXPECT_TRUE(second.should_log(logging::LogLevel::Debug));
+  logging::reset_level("shared");
+}
+
+TEST(Logging, CustomLoggerIgnoresLevelSettings)
+{
+  std::ostringstream out;
+  const logging::Logger custom{ std::make_shared<spdlog::logger>(
+      "custom_levels", std::make_shared<spdlog::sinks::ostream_sink_mt>(out)) };
+  logging::set_level("custom_levels", logging::LogLevel::Debug);
+  logging::set_level(logging::Default, logging::LogLevel::Debug);
+  EXPECT_FALSE(custom.should_log(logging::LogLevel::Debug));
+  logging::reset_level(logging::Default);
+  logging::reset_level("custom_levels");
+}
+
+TEST(Logging, MovedFromLoggerStaysUsable)
+{
+  auto logger = logging::get_logger("moved");
+  const auto moved = std::move(logger);
+  EXPECT_EQ(moved.name(), "moved");
+  EXPECT_EQ(logger.name(), "moved");  // NOLINT(bugprone-use-after-move): moving copies
+}
+
+TEST(Logging, InvalidArgumentsThrow)
+{
+  EXPECT_THROW((void)logging::get_logger(""), std::invalid_argument);
+  EXPECT_THROW(logging::set_level("", logging::LogLevel::Info), std::invalid_argument);
+  EXPECT_THROW(logging::set_level({}, logging::LogLevel::Info), std::invalid_argument);
+  EXPECT_THROW(logging::reset_level(""), std::invalid_argument);
+  EXPECT_THROW((void)logging::get_level(""), std::invalid_argument);
+  EXPECT_THROW((void)logging::get_effective_level(""), std::invalid_argument);
+  EXPECT_THROW(logging::Logger{ nullptr }, std::invalid_argument);
+  EXPECT_THROW(logging::attach_sink(nullptr), std::invalid_argument);
+  EXPECT_THROW(logging::set_default_sink(nullptr), std::invalid_argument);
+}
+
+TEST(Logging, DisabledStreamDoesNotFormat)
+{
+  auto logger = logging::get_logger("stream_disabled");
+  int calls = 0;
+  logging::debug(logger) << Counted{ &calls };
+  EXPECT_EQ(calls, 0);
+  logging::info(logger) << Counted{ &calls };
+  EXPECT_EQ(calls, 1);
+}
+
+TEST(Logging, ParseLevelAcceptsPrintedNamesAndWarn)
+{
+  EXPECT_EQ(logging::parse_level_from_string("debug"), logging::LogLevel::Debug);
+  EXPECT_EQ(logging::parse_level_from_string("Warning"), logging::LogLevel::Warning);
+  EXPECT_EQ(logging::parse_level_from_string("warn"), logging::LogLevel::Warning);
+  EXPECT_EQ(logging::parse_level_from_string("WARN"), logging::LogLevel::Warning);
+  EXPECT_EQ(logging::parse_level_from_string("fatal"), logging::LogLevel::Fatal);
+  EXPECT_FALSE(logging::parse_level_from_string("trace").has_value());
+  EXPECT_FALSE(logging::parse_level_from_string("").has_value());
+}
+
+TEST(Logging, LevelNamesRoundTrip)
+{
+  for (const auto level : logging::log_levels) {
+    EXPECT_EQ(logging::parse_level_from_string(logging::to_string(level)), level) << logging::to_string(level);
+  }
+  static_assert(logging::to_string(logging::LogLevel::Warning) == "warning");
 }
 
 TEST(Logging, ThrottledMessageGoesOutFirstThenOncePerPeriod)
@@ -172,7 +377,7 @@ TEST(Logging, ThrottledMessageGoesOutFirstThenOncePerPeriod)
   std::ostringstream out;
   auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
   sink->set_pattern("%v");
-  spdlog::logger logger{ "throttled", sink };
+  const logging::Logger logger{ std::make_shared<spdlog::logger>("throttled", sink) };
 
   const logging::LogThrottle::Clock::time_point start{};
   const std::chrono::milliseconds ms{ 1 };
@@ -188,7 +393,7 @@ TEST(Logging, LogOnceMessageGoesOutOnlyOnce)
   std::ostringstream out;
   auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
   sink->set_pattern("%v");
-  spdlog::logger logger{ "once", sink };
+  const logging::Logger logger{ std::make_shared<spdlog::logger>("once", sink) };
 
   logging::LogOnce once;
   for (const auto i : { 0, 1, 2 }) {
@@ -196,3 +401,42 @@ TEST(Logging, LogOnceMessageGoesOutOnlyOnce)
   }
   EXPECT_EQ(out.str(), "call 0\n");
 }
+
+TEST(Logging, DisabledOnceAndThrottledMessagesAppearAfterRaisingTheLevel)
+{
+  auto logger = logging::get_logger("raised_later");
+  const Capture capture;
+  logging::LogOnce once;
+  logging::LogThrottle throttle{ std::chrono::seconds(1) };
+  const logging::LogThrottle::Clock::time_point start{};
+
+  logging::debug(once, logger, "once");
+  logging::debug(throttle, start, logger, "throttled");
+  EXPECT_TRUE(capture.str().empty()) << capture.str();
+
+  logging::set_level("raised_later", logging::LogLevel::Debug);
+  logging::debug(once, logger, "once");
+  logging::debug(throttle, start + std::chrono::milliseconds(1), logger, "throttled");
+  EXPECT_TRUE(capture.contains("raised_later debug: once")) << capture.str();
+  EXPECT_TRUE(capture.contains("raised_later debug: throttled")) << capture.str();
+
+  logging::reset_level("raised_later");
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+TEST(Logging, DeprecatedGetLoggerWithDefaultSinkIsGetLogger)
+{
+  auto logger = logging::get_logger_with_default_sink("deprecated_getter");
+  logging::set_level("deprecated_getter", logging::LogLevel::Debug);
+  EXPECT_TRUE(logger.should_log(logging::LogLevel::Debug));
+  logging::reset_level("deprecated_getter");
+}
+
+TEST(Logging, DeprecatedConfigureLevelSetsTheDefaultLevel)
+{
+  logging::configure_level(logging::LogLevel::Warning);
+  EXPECT_EQ(logging::get_level(logging::Default), logging::LogLevel::Warning);
+  logging::reset_level(logging::Default);
+}
+#pragma GCC diagnostic pop

@@ -5,7 +5,7 @@ on:
       ros_distro:
         description: 'Distro to build'
         type: choice
-        options: [all, humble, jazzy, kilted, lyrical, rolling]
+        options: [all, jazzy, kilted, lyrical, rolling]
         default: all
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -24,5 +24,4 @@ jobs:
     with:
       ros_distro: ${{ inputs.ros_distro }}
       gated: ${{ github.event_name != 'schedule' }}
-      extra_distros: humble
     secrets: inherit

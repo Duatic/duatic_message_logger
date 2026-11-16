@@ -23,19 +23,37 @@
  */
 #pragma once
 
+// This header is also compiled as C++17 by the users of the MELO compatibility package (message_logger), so it must
+// stay C++17 compatible: no concepts, ranges or other C++20 features here; the library sources may use C++20.
+
+#include <array>
 #include <chrono>
-#include <string>
-#include <utility>
 #include <memory>
-#include <sstream>
 #include <optional>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include <spdlog/spdlog.h>  // NOLINT(build/include_order)
 
+/**
+ * Loggers, levels and sinks
+ *
+ * - A registered logger is obtained with get_logger(name), or is the default logger. Its level comes from the level
+ *   settings (set_level), never from ROS.
+ * - A custom logger is a Logger built from your own spdlog::logger. It owns its level, which you set on that
+ *   spdlog::logger; level settings never touch it.
+ * - A level setting for a name applies to that name and to every name below it: "a" covers "a.b" and "a.b.c", but not
+ *   "ab", as in ROS 2. Where no setting matches, the Default level applies (Info until set). The Default level is not
+ *   the level of the default logger, which is set by its name like any other logger.
+ * - Registered loggers write to the default sink. It forwards every record to one output (set_default_sink, by default
+ *   ROS 2 logging when the process has it loaded, stdout otherwise) and to any number of attached sinks (attach_sink).
+ * - Loggers decide, sinks are destinations: a record is filtered once, by its logger's level, and every sink receives
+ *   all records that passed. Keep sinks at their default level (trace) and filter only for display.
+ */
 namespace duatic::message_logger
 {
-
-using Logger = spdlog::logger;
 
 // We support the same log levels as ROS2
 enum class LogLevel
@@ -47,17 +65,115 @@ enum class LogLevel
   Fatal
 };
 
+/// @brief All levels, from the most to the least verbose.
+inline constexpr std::array<LogLevel, 5> log_levels{ LogLevel::Debug, LogLevel::Info, LogLevel::Warning,
+                                                     LogLevel::Error, LogLevel::Fatal };
+
+/**
+ * @brief The name of a level as parse_level_from_string() accepts it: debug, info, warning, error or fatal.
+ */
+[[nodiscard]] constexpr std::string_view to_string(const LogLevel level) noexcept
+{
+  switch (level) {
+    case LogLevel::Debug:
+      return "debug";
+    case LogLevel::Info:
+      return "info";
+    case LogLevel::Warning:
+      return "warning";
+    case LogLevel::Error:
+      return "error";
+    case LogLevel::Fatal:
+      return "fatal";
+  }
+  return "invalid";
+}
+
 /**
  * @brief parse the LogLevel from the given string
+ * @note accepts the names to_string() returns, case insensitive, and "warn"
  */
 [[nodiscard]] std::optional<LogLevel> parse_level_from_string(std::string_view text) noexcept;
 
 std::ostream& operator<<(std::ostream& os, const LogLevel level);
 
+class Logger;
+
+namespace impl
+{
+
+constexpr spdlog::level::level_enum to_spdlog(const LogLevel level) noexcept
+{
+  switch (level) {
+    case LogLevel::Debug:
+      return spdlog::level::debug;
+    case LogLevel::Info:
+      return spdlog::level::info;
+    case LogLevel::Warning:
+      return spdlog::level::warn;
+    case LogLevel::Error:
+      return spdlog::level::err;
+    case LogLevel::Fatal:
+      return spdlog::level::critical;
+  }
+  return spdlog::level::info;
+}
+
+spdlog::logger& spdlog_logger(const Logger& logger) noexcept;
+
+}  // namespace impl
+
+/**
+ * @brief Handle to a logger; copies refer to the same logger.
+ *
+ * Obtain registered loggers with get_logger(), or wrap your own spdlog::logger to get a custom logger.
+ */
+class Logger
+{
+public:
+  /**
+   * @brief Creates a custom logger, which owns its level and its sinks.
+   * @throws std::invalid_argument if @p logger is null.
+   */
+  explicit Logger(std::shared_ptr<spdlog::logger> logger);
+
+  // No move operations: moving copies, so a handle never becomes empty
+  Logger(const Logger&) = default;
+  Logger& operator=(const Logger&) = default;
+  ~Logger() = default;
+
+  [[nodiscard]] const std::string& name() const noexcept
+  {
+    return logger_->name();
+  }
+
+  /// @brief Returns whether a record of @p level passes the logger's level.
+  [[nodiscard]] bool should_log(const LogLevel level) const noexcept
+  {
+    return logger_->should_log(impl::to_spdlog(level));
+  }
+
+private:
+  friend spdlog::logger& impl::spdlog_logger(const Logger& logger) noexcept;
+
+  std::shared_ptr<spdlog::logger> logger_;
+};
+
+namespace impl
+{
+
+inline spdlog::logger& spdlog_logger(const Logger& logger) noexcept
+{
+  return *logger.logger_;
+}
+
+}  // namespace impl
+
 /**
  * @brief Lets a repeated message through at most once per period, on the time passed to the throttled log calls.
  *
- * Keep one per message, and one per object when several objects log the same message.
+ * Keep one per message, and one per object when several objects log the same message. A message below the logger's
+ * level does not start a period.
  *
  * @note Not thread safe.
  */
@@ -76,7 +192,7 @@ public:
 
 private:
   template <typename... Args>
-  friend void log(LogThrottle& throttle, Clock::time_point now, Logger& logger, LogLevel level,
+  friend void log(LogThrottle& throttle, Clock::time_point now, const Logger& logger, LogLevel level,
                   fmt::format_string<Args...> fmt, Args&&... args);
 
   /// @brief Returns true on the first call and once the period has passed, and then starts a new period.
@@ -96,7 +212,8 @@ private:
 /**
  * @brief Lets a message through only the first time it is logged.
  *
- * Keep one per message, and one per object when several objects log the same message.
+ * Keep one per message, and one per object when several objects log the same message. A message below the logger's
+ * level does not count as logged.
  *
  * @note Not thread safe.
  */
@@ -104,7 +221,7 @@ class LogOnce
 {
 private:
   template <typename... Args>
-  friend void log(LogOnce& once, Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args);
+  friend void log(LogOnce& once, const Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args);
 
   bool logged_{ false };
 };
@@ -112,68 +229,60 @@ private:
 /**
  * @brief obtain the currently configured default logger
  */
-Logger& get_default_logger();
+[[nodiscard]] const Logger& get_default_logger();
 
 namespace impl
 {
 
-// Wrapper around spdlog logger which provide a streaming style api
+// Wrapper around spdlog logger which provide a streaming style api; does nothing below the logger's level
 class LogStream
 {
 public:
-  LogStream(Logger& logger, LogLevel level) : logger_(&logger), level_(level)
+  LogStream(const Logger& logger, LogLevel level) : logger_(&spdlog_logger(logger)), level_(level)
   {
+    if (logger.should_log(level)) {
+      oss_.emplace();
+    }
   }
 
   template <typename T>
   LogStream& operator<<(const T& value)
   {
-    oss_ << value;
+    if (oss_) {
+      *oss_ << value;
+    }
     return *this;
   }
 
   LogStream& operator<<(std::ostream& (*manip)(std::ostream&))
   {
-    manip(oss_);
+    if (oss_) {
+      manip(*oss_);
+    }
     return *this;
   }
   LogStream& operator<<(std::ios_base& (*manip)(std::ios_base&))
   {
-    manip(oss_);
+    if (oss_) {
+      manip(*oss_);
+    }
     return *this;
   }
-  // Implemented in cpp file to hide direct spdlog reference
   ~LogStream();
 
 private:
-  Logger* logger_;
+  spdlog::logger* logger_;
   LogLevel level_;
-  std::ostringstream oss_;
+  std::optional<std::ostringstream> oss_;  ///< Only constructed when the record passes the logger's level
 };
 
 }  // namespace impl
 
 // fmt style api
 template <typename... Args>
-inline void log(Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
+inline void log(const Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
 {
-  switch (level) {
-    case LogLevel::Debug:
-      logger.debug(fmt, std::forward<Args>(args)...);
-      break;
-    case LogLevel::Info:
-      logger.info(fmt, std::forward<Args>(args)...);
-      break;
-    case LogLevel::Warning:
-      logger.warn(fmt, std::forward<Args>(args)...);
-      break;
-    case LogLevel::Error:
-      logger.error(fmt, std::forward<Args>(args)...);
-      break;
-    case LogLevel::Fatal:
-      logger.critical(fmt, std::forward<Args>(args)...);
-      break;
-  }
+  impl::spdlog_logger(logger).log(impl::to_spdlog(level), fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
 inline void log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
@@ -187,7 +296,7 @@ inline void debug(fmt::format_string<Args...> fmt, Args&&... args)
   log(LogLevel::Debug, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void debug(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void debug(const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(logger, LogLevel::Debug, fmt, std::forward<Args>(args)...);
 }
@@ -198,7 +307,7 @@ inline void info(fmt::format_string<Args...> fmt, Args&&... args)
   log(LogLevel::Info, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void info(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void info(const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(logger, LogLevel::Info, fmt, std::forward<Args>(args)...);
 }
@@ -210,7 +319,7 @@ inline void warning(fmt::format_string<Args...> fmt, Args&&... args)
 }
 
 template <typename... Args>
-inline void warning(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void warning(const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(logger, LogLevel::Warning, fmt, std::forward<Args>(args)...);
 }
@@ -221,7 +330,7 @@ inline void error(fmt::format_string<Args...> fmt, Args&&... args)
   log(LogLevel::Error, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void error(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void error(const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(logger, LogLevel::Error, fmt, std::forward<Args>(args)...);
 }
@@ -232,82 +341,82 @@ inline void fatal(fmt::format_string<Args...> fmt, Args&&... args)
   log(LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void fatal(Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void fatal(const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
 
-// throttled fmt style api: formats and logs only when the throttle lets the message through
+// throttled fmt style api: formats and logs only when the level passes and the throttle lets the message through
 template <typename... Args>
-inline void log(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger, LogLevel level,
+inline void log(LogThrottle& throttle, LogThrottle::Clock::time_point now, const Logger& logger, LogLevel level,
                 fmt::format_string<Args...> fmt, Args&&... args)
 {
-  if (throttle.ready(now)) {
+  if (logger.should_log(level) && throttle.ready(now)) {
     log(logger, level, fmt, std::forward<Args>(args)...);
   }
 }
 template <typename... Args>
-inline void debug(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+inline void debug(LogThrottle& throttle, LogThrottle::Clock::time_point now, const Logger& logger,
                   fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(throttle, now, logger, LogLevel::Debug, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void info(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+inline void info(LogThrottle& throttle, LogThrottle::Clock::time_point now, const Logger& logger,
                  fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(throttle, now, logger, LogLevel::Info, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void warning(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+inline void warning(LogThrottle& throttle, LogThrottle::Clock::time_point now, const Logger& logger,
                     fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(throttle, now, logger, LogLevel::Warning, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void error(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+inline void error(LogThrottle& throttle, LogThrottle::Clock::time_point now, const Logger& logger,
                   fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(throttle, now, logger, LogLevel::Error, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void fatal(LogThrottle& throttle, LogThrottle::Clock::time_point now, Logger& logger,
+inline void fatal(LogThrottle& throttle, LogThrottle::Clock::time_point now, const Logger& logger,
                   fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(throttle, now, logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
 
-// log once fmt style api: formats and logs only the first call
+// log once fmt style api: formats and logs only the first call whose level passes
 template <typename... Args>
-inline void log(LogOnce& once, Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
+inline void log(LogOnce& once, const Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
 {
-  if (!once.logged_) {
+  if (logger.should_log(level) && !once.logged_) {
     once.logged_ = true;
     log(logger, level, fmt, std::forward<Args>(args)...);
   }
 }
 template <typename... Args>
-inline void debug(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void debug(LogOnce& once, const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(once, logger, LogLevel::Debug, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void info(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void info(LogOnce& once, const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(once, logger, LogLevel::Info, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void warning(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void warning(LogOnce& once, const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(once, logger, LogLevel::Warning, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void error(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void error(LogOnce& once, const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(once, logger, LogLevel::Error, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
-inline void fatal(LogOnce& once, Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
+inline void fatal(LogOnce& once, const Logger& logger, fmt::format_string<Args...> fmt, Args&&... args)
 {
   log(once, logger, LogLevel::Fatal, fmt, std::forward<Args>(args)...);
 }
@@ -317,7 +426,7 @@ inline impl::LogStream log(LogLevel level)
 {
   return impl::LogStream(get_default_logger(), level);
 }
-inline impl::LogStream log(Logger& logger, LogLevel level)
+inline impl::LogStream log(const Logger& logger, LogLevel level)
 {
   return impl::LogStream(logger, level);
 }
@@ -325,7 +434,7 @@ inline impl::LogStream debug()
 {
   return log(LogLevel::Debug);
 }
-inline impl::LogStream debug(Logger& logger)
+inline impl::LogStream debug(const Logger& logger)
 {
   return log(logger, LogLevel::Debug);
 }
@@ -334,7 +443,7 @@ inline impl::LogStream info()
 {
   return log(LogLevel::Info);
 }
-inline impl::LogStream info(Logger& logger)
+inline impl::LogStream info(const Logger& logger)
 {
   return log(logger, LogLevel::Info);
 }
@@ -343,7 +452,7 @@ inline impl::LogStream warning()
 {
   return log(LogLevel::Warning);
 }
-inline impl::LogStream warning(Logger& logger)
+inline impl::LogStream warning(const Logger& logger)
 {
   return log(logger, LogLevel::Warning);
 }
@@ -351,7 +460,7 @@ inline impl::LogStream error()
 {
   return log(LogLevel::Error);
 }
-inline impl::LogStream error(Logger& logger)
+inline impl::LogStream error(const Logger& logger)
 {
   return log(logger, LogLevel::Error);
 }
@@ -359,48 +468,117 @@ inline impl::LogStream fatal()
 {
   return log(LogLevel::Fatal);
 }
-inline impl::LogStream fatal(Logger& logger)
+inline impl::LogStream fatal(const Logger& logger)
 {
   return log(logger, LogLevel::Fatal);
 }
 
 /**
- * @brief configure the default logger which is used if no logger is pased to the functions
- * @note this also changes the per default used sink !
+ * @brief obtain the registered logger with the given name, creating it on first use
+ * @note the same name always returns the same logger; it writes to the default sink and follows the level settings
+ * @throws std::invalid_argument if @p name is empty
  */
-void configure_logger(Logger& logger);
-/**
- * @brief configure the default logger and add the default sink to it
- */
-void configure_logger_with_default_sink(Logger& logger);
+[[nodiscard]] Logger get_logger(const std::string& name);
+
 /**
  * @brief obtain a named logger configured to use the default sink
  */
-Logger get_logger_with_default_sink(const std::string& name);
+[[deprecated("use get_logger"), nodiscard]] Logger get_logger_with_default_sink(const std::string& name);
 
 /**
- * @brief configure the maximum log level of the default sink (and therefore all attached loggers)
+ * @brief configure the default logger which is used if no logger is passed to the functions
+ * @note a registered logger keeps following the level settings, a custom logger keeps its own level and sinks
+ * @note not synchronized with logging; call it before other threads log through the default logger
  */
-void configure_level(const LogLevel maximum_log_level);
+void configure_logger(const Logger& logger);
+/**
+ * @brief configure a copy of the given logger, with the default sink added, as the default logger
+ * @note the copy is a custom logger: it keeps the level of @p logger
+ * @note not synchronized with logging; call it before other threads log through the default logger
+ */
+void configure_logger_with_default_sink(const Logger& logger);
+
+/// @brief Selects the Default level in the level functions, e.g. set_level(Default, LogLevel::Debug).
+struct DefaultLevelTag
+{
+  enum class Construct
+  {
+    token
+  };
+  // No default constructor, as for std::nullopt_t: `{}` never converts to the tag
+  explicit constexpr DefaultLevelTag(Construct /*token*/) noexcept
+  {
+  }
+};
+
+/// @brief The level of every registered logger that no name setting covers; not the level of the default logger.
+inline constexpr DefaultLevelTag Default{ DefaultLevelTag::Construct::token };
 
 /**
- * @brief route everything written to the default sink to another sink
+ * @brief set the level of a name and of every name below it
+ * @throws std::invalid_argument if @p name is empty
+ */
+void set_level(const std::string& name, LogLevel level);
+/**
+ * @brief set the Default level, used by registered loggers that no name setting covers
+ */
+void set_level(DefaultLevelTag, LogLevel level);
+
+/**
+ * @brief remove the setting of a name, so it inherits again
+ * @throws std::invalid_argument if @p name is empty
+ */
+void reset_level(const std::string& name);
+/**
+ * @brief remove the Default level setting, which brings back Info
+ */
+void reset_level(DefaultLevelTag);
+
+/**
+ * @brief obtain the level set for exactly this name, if any
+ * @throws std::invalid_argument if @p name is empty
+ */
+[[nodiscard]] std::optional<LogLevel> get_level(const std::string& name);
+/**
+ * @brief obtain the Default level, if one was set
+ */
+[[nodiscard]] std::optional<LogLevel> get_level(DefaultLevelTag);
+
+/**
+ * @brief obtain the level a registered logger of this name uses
+ * @throws std::invalid_argument if @p name is empty
+ */
+[[nodiscard]] LogLevel get_effective_level(const std::string& name);
+/**
+ * @brief obtain the Default level in force: the one set, or Info
+ */
+[[nodiscard]] LogLevel get_effective_level(DefaultLevelTag);
+
+/**
+ * @brief configure the level of all registered loggers
+ */
+[[deprecated("use set_level(Default, level)")]] void configure_level(const LogLevel maximum_log_level);
+
+/**
+ * @brief replace the output of the default sink
  * @note by default it goes to ROS 2 logging when the process has rcutils loaded, to stdout otherwise
- * @note applies to loggers created before the call as well, they keep the default sink but it forwards elsewhere
- * @note replaces all sinks the default sink forwards to, including those added with add_default_sink()
+ * @note applies to loggers created before the call as well; attached sinks stay attached
+ * @throws std::invalid_argument if @p sink is null
  */
 void set_default_sink(spdlog::sink_ptr sink);
 
 /**
- * @brief also forward everything written to the default sink to another sink, in addition to the current ones
- * @note applies to loggers created before the call as well
- * @note the added sink filters with its own level
+ * @brief also forward every record written to the default sink to @p sink
+ * @note applies to loggers created before the call as well; attaching an attached sink again has no effect, attaching
+ * the current output delivers its records twice
+ * @throws std::invalid_argument if @p sink is null
  */
-void add_default_sink(spdlog::sink_ptr sink);
+void attach_sink(spdlog::sink_ptr sink);
 
 /**
- * @brief stop forwarding to a sink added with add_default_sink()
+ * @brief stop forwarding to a sink attached with attach_sink()
+ * @note once it returns, @p sink receives no further records; detaching a sink that is not attached has no effect
  */
-void remove_default_sink(const spdlog::sink_ptr& sink);
+void detach_sink(const spdlog::sink_ptr& sink);
 
 }  // namespace duatic::message_logger
