@@ -149,5 +149,13 @@ void set_default_sink(spdlog::sink_ptr sink)
 {
   forwarding_sink()->set_sinks({ std::move(sink) });
 }
+void add_default_sink(spdlog::sink_ptr sink)
+{
+  forwarding_sink()->add_sink(std::move(sink));
+}
+void remove_default_sink(const spdlog::sink_ptr& sink)
+{
+  forwarding_sink()->remove_sink(sink);
+}
 
 }  // namespace duatic::message_logger
