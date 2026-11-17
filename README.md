@@ -304,6 +304,53 @@ ROS only handles its own loggers: ROS levels and `--ros-args --log-level` do not
 settings do not change ROS's; use `set_level` (e.g. from a node parameter). The records do not go to `/rosout`, which
 rcl only publishes for loggers that belong to a node.
 
+## 10. Python
+
+The package also installs the Python module `duatic_message_logger`. Python and the C++ code of a process share one
+logger registry: a logger of the same name is the same logger, and level settings made in Python also apply to the C++
+loggers (e.g. the DuaDrive SDK), and the other way round.
+
+```python
+import duatic_message_logger as dml
+
+log = dml.get_logger("duatic.my_tool")
+log.info("connected to {}", bus)    # formatted with str.format, only if the level passes
+log.warning(f"plain message {x}")  # a message without arguments is logged as it is
+dml.info("through the default logger")
+
+dml.set_level(dml.Default, dml.LogLevel.Debug)
+dml.set_level("duatic.ecat", dml.LogLevel.Warning)
+level = dml.parse_level("warn")    # None for an unknown name
+```
+
+**GUI applications** attach a `QueueSink` and drain it from a timer of the GUI thread. The sink is plain C++: the
+logging threads never wait for Python, and it holds up to `capacity` records, dropping the oldest when full.
+
+```python
+sink = dml.QueueSink(capacity=10000)
+dml.attach_sink(sink)
+
+def on_timer():  # e.g. a QTimer, Tk after() or a frame callback
+    for record in sink.drain():
+        view.append(record.level, record.logger_name, record.message, record.timestamp_ns)
+    # sink.dropped: records lost because the sink was full
+
+dml.detach_sink(sink)  # when the view closes
+```
+
+**Python's logging module**: `bridge_python_logging()` adds a `LoggingHandler` to the root logger (or the logger
+passed), which logs every record through the duatic logger of the same name; the root logger maps to the default
+logger. It sets that logger to `DEBUG`, so the duatic levels decide.
+
+```python
+import logging
+
+dml.bridge_python_logging()
+logging.getLogger("duatic.my_tool").info("value %s", 1)  # logged by duatic.my_tool
+```
+
+The output is chosen at the first record: import `rclpy` before the first record so the records go to ROS 2 logging.
+
 # Contributing
 
 Please see the [Contributing guide](./CONTRIBUTING.md)

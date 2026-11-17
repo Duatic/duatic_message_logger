@@ -16,6 +16,8 @@ Forthcoming
   set_default_sink to set_output_sink and parse_level_from_string to parse_level
 * feat!: remove get_logger_with_default_sink (use get_logger), configure_level (use set_level(Default, level)) and
   configure_logger_with_default_sink (use get_logger, or set_default_logger with a custom logger)
+* feat: Python bindings in the same package: loggers, levels, a QueueSink for GUIs and a bridge from Python's logging
+  module
 * feat: LogThrottle and LogOnce let repeated messages through once per period or only once (#20); a message below
   the logger's level does not use up their slot
 * feat: attach_sink / detach_sink forward records to additional sinks; set_output_sink replaces only the output

@@ -9,6 +9,10 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(rcutils REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(pybind11_vendor REQUIRED)
+find_package(pybind11 REQUIRED)
 
 add_library(duatic_message_logger src/logging.cpp src/rcutils_sink.cpp)
 add_library(duatic_message_logger::duatic_message_logger ALIAS duatic_message_logger)
@@ -57,6 +61,20 @@ install(
   RUNTIME DESTINATION bin
 )
 
+# Python bindings: the package duatic_message_logger with the extension module _bindings. The build tree gets the same
+# layout, so the tests import it from there.
+set(PYTHON_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/python)
+file(GLOB PYTHON_SOURCES CONFIGURE_DEPENDS python/${PROJECT_NAME}/*.py)
+pybind11_add_module(_bindings src/python/bindings.cpp)
+target_link_libraries(_bindings PRIVATE duatic_message_logger)
+target_compile_options(_bindings PRIVATE -Wall -Wextra -Werror=return-type)
+set_target_properties(_bindings PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PYTHON_BUILD_DIR}/${PROJECT_NAME})
+add_custom_command(TARGET _bindings POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PYTHON_SOURCES} ${PYTHON_BUILD_DIR}/${PROJECT_NAME}
+)
+ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR python/${PROJECT_NAME})
+install(TARGETS _bindings LIBRARY DESTINATION ${PYTHON_INSTALL_DIR}/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_logging
@@ -69,6 +87,11 @@ if(BUILD_TESTING)
   # Stands in for a ROS 2 process: rcutils is linked by the test, not by the library
   ament_add_gtest(test_rcutils_detection test/test_rcutils_detection.cpp)
   target_link_libraries(test_rcutils_detection duatic_message_logger rcutils::rcutils)
+
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_python test/python
+    ENV PYTHONPATH=${PYTHON_BUILD_DIR}
+  )
 endif()
 
 ament_export_include_directories(
