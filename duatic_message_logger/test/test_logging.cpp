@@ -330,7 +330,7 @@ TEST(Logging, MovedFromLoggerStaysUsable)
   auto logger = logging::get_logger("moved");
   const auto moved = std::move(logger);
   EXPECT_EQ(moved.name(), "moved");
-  EXPECT_EQ(logger.name(), "moved");  // NOLINT(bugprone-use-after-move): moving copies
+  EXPECT_EQ(logger.name(), "moved");  // NOLINT: use after move is intended, moving copies
 }
 
 TEST(Logging, InvalidArgumentsThrow)

@@ -289,15 +289,15 @@ PYBIND11_MODULE(_bindings, m)
   m.def("reset_level", py::overload_cast<const std::string&>(&reset_level), py::arg("name"),
         "Removes the setting of the name, so it inherits again.");
   m.def("reset_level", py::overload_cast<DefaultLevelTag>(&reset_level), py::arg("tag"),
-        "Removes the Default level setting, which brings back Info.");
+        "Removes the Default level setting, which brings back DUATIC_LOG_LEVEL, else Info.");
   m.def("get_level", py::overload_cast<const std::string&>(&get_level), py::arg("name"),
         "Returns the level set for exactly the name, or None.");
   m.def("get_level", py::overload_cast<DefaultLevelTag>(&get_level), py::arg("tag"),
-        "Returns the Default level, or None if none was set.");
+        "Returns the Default level, or None if none was set; DUATIC_LOG_LEVEL is not a setting.");
   m.def("get_effective_level", py::overload_cast<const std::string&>(&get_effective_level), py::arg("name"),
         "Returns the level a registered logger of the name uses.");
   m.def("get_effective_level", py::overload_cast<DefaultLevelTag>(&get_effective_level), py::arg("tag"),
-        "Returns the Default level in force: the one set, or Info.");
+        "Returns the Default level in force: the one set, else DUATIC_LOG_LEVEL, else Info.");
 
   py::class_<LogRecord>(m, "LogRecord", "A record as QueueSink.drain() returns it.")
       .def_readonly("level", &LogRecord::level)

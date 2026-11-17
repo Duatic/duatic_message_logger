@@ -97,6 +97,12 @@ if(BUILD_TESTING)
   ament_add_gtest(test_rcutils_detection test/test_rcutils_detection.cpp)
   target_link_libraries(test_rcutils_detection duatic_message_logger rcutils::rcutils)
 
+  # The registry is process-wide, so each value of DUATIC_LOG_LEVEL needs its own process
+  ament_add_gtest(test_env_level test/test_env_level.cpp ENV DUATIC_LOG_LEVEL=WARN)
+  target_link_libraries(test_env_level duatic_message_logger)
+  ament_add_gtest(test_env_level_invalid test/test_env_level_invalid.cpp ENV DUATIC_LOG_LEVEL=verbose)
+  target_link_libraries(test_env_level_invalid duatic_message_logger)
+
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_python test/python
     ENV PYTHONPATH=${PYTHON_BUILD_DIR} PYTHONDONTWRITEBYTECODE=1

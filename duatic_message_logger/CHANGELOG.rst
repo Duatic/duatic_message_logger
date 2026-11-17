@@ -18,6 +18,7 @@ Forthcoming
   configure_logger_with_default_sink (use get_logger, or set_default_logger with a custom logger)
 * feat: Python bindings in the same package: loggers, levels, a QueueSink for GUIs and a bridge from Python's logging
   module
+* feat: the DUATIC_LOG_LEVEL environment variable sets the Default level until set_level(Default, ...) is called
 * feat: LogThrottle and LogOnce let repeated messages through once per period or only once (#20); a message below
   the logger's level does not use up their slot
 * feat: attach_sink / detach_sink forward records to additional sinks; set_output_sink replaces only the output

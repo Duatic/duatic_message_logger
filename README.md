@@ -214,8 +214,13 @@ formatted. The output and every attached sink receive all records that passed. K
 filter only for display, e.g. in a GUI log view.
 
 **Levels** are set by name and apply to that name and every name below it (`a` covers `a.b` and `a.b.c`, not `ab`).
-Where no name setting matches, the `Default` level applies (Info until set). The most specific setting wins, and
-changes also apply to loggers created before the call.
+Where no name setting matches, the `Default` level applies (until set: `DUATIC_LOG_LEVEL`, else Info). The most
+specific setting wins, and changes also apply to loggers created before the call.
+
+The environment variable `DUATIC_LOG_LEVEL` chooses the `Default` level without code changes, e.g.
+`DUATIC_LOG_LEVEL=debug ros2 run ...`. It takes the `parse_level` names (any case, also `warn`), is read once at the
+first use of a logger, and also applies to Python. An invalid value is reported on stderr and ignored. Any
+`set_level` call still wins over it, and `reset_level(logging::Default)` brings it back.
 
 ```c++
 logging::set_level(logging::Default, logging::LogLevel::Warning);       // everything not set by name

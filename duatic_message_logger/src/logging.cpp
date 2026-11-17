@@ -24,6 +24,8 @@
 #include "duatic_message_logger/logging.hpp"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #include <stdexcept>
 #include <unordered_map>
@@ -91,8 +93,22 @@ Sinks& sinks()
   return state;
 }
 
-// The Default level until set_level(Default, ...) is called
-constexpr LogLevel built_in_default_level = LogLevel::Info;
+// The Default level until set_level(Default, ...) is called: DUATIC_LOG_LEVEL, read once at first use, else Info
+LogLevel built_in_default_level()
+{
+  static const LogLevel level = [] {
+    const char* value = std::getenv("DUATIC_LOG_LEVEL");
+    if (value == nullptr || value[0] == '\0') {
+      return LogLevel::Info;
+    }
+    if (const auto parsed = parse_level(value)) {
+      return *parsed;
+    }
+    std::fprintf(stderr, "duatic_message_logger: ignoring DUATIC_LOG_LEVEL=%s\n", value);
+    return LogLevel::Info;
+  }();
+  return level;
+}
 
 void check_name(const std::string& name)
 {
@@ -192,7 +208,7 @@ private:
       }
       const auto dot = name.rfind('.');
       if (dot == std::string_view::npos) {
-        return default_level_.value_or(built_in_default_level);
+        return default_level_.value_or(built_in_default_level());
       }
       name = name.substr(0, dot);
     }
@@ -287,7 +303,7 @@ LogLevel get_effective_level(const std::string& name)
 }
 LogLevel get_effective_level(DefaultLevelTag)
 {
-  return registry().default_level().value_or(built_in_default_level);
+  return registry().default_level().value_or(built_in_default_level());
 }
 
 void set_output_sink(spdlog::sink_ptr sink)

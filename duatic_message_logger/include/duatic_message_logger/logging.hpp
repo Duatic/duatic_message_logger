@@ -47,8 +47,9 @@
  * - A custom logger is a Logger built from your own spdlog::logger. It owns its level, which you set on that
  *   spdlog::logger; level settings never touch it.
  * - A level setting for a name applies to that name and to every name below it: "a" covers "a.b" and "a.b.c", but not
- *   "ab", as in ROS 2. Where no setting matches, the Default level applies (Info until set). The Default level is not
- *   the level of the default logger, which is set by its name like any other logger.
+ *   "ab", as in ROS 2. Where no setting matches, the Default level applies (until set: the environment variable
+ *   DUATIC_LOG_LEVEL, read once at first use, else Info). The Default level is not the level of the default logger,
+ *   which is set by its name like any other logger.
  * - Registered loggers write every record to one output (set_output_sink; by default ROS 2 logging when the process has
  *   it loaded, stdout otherwise) and to any number of attached sinks (attach_sink).
  * - Loggers decide, sinks are destinations: a record is filtered once, by its logger's level, and every sink receives
@@ -616,7 +617,7 @@ void set_level(DefaultLevelTag, LogLevel level);
  */
 void reset_level(const std::string& name);
 /**
- * @brief Removes the Default level setting, which brings back Info.
+ * @brief Removes the Default level setting, which brings back DUATIC_LOG_LEVEL, else Info.
  */
 void reset_level(DefaultLevelTag);
 
@@ -626,7 +627,7 @@ void reset_level(DefaultLevelTag);
  */
 [[nodiscard]] std::optional<LogLevel> get_level(const std::string& name);
 /**
- * @brief Returns the Default level, if one was set.
+ * @brief Returns the Default level, if one was set; DUATIC_LOG_LEVEL is not a setting.
  */
 [[nodiscard]] std::optional<LogLevel> get_level(DefaultLevelTag);
 
@@ -636,7 +637,7 @@ void reset_level(DefaultLevelTag);
  */
 [[nodiscard]] LogLevel get_effective_level(const std::string& name);
 /**
- * @brief Returns the Default level in force: the one set, or Info.
+ * @brief Returns the Default level in force: the one set, else DUATIC_LOG_LEVEL, else Info.
  */
 [[nodiscard]] LogLevel get_effective_level(DefaultLevelTag);
 
