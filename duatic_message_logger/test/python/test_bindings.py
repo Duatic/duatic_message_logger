@@ -71,8 +71,59 @@ def test_records_reach_the_sink(sink):
     log.warning("braces {kept}")  # without arguments the message is not formatted
     log.debug("dropped")
     records = records_of(sink, "py.records")
-    assert [(record.level, record.message) for record in records] == [(Info, "value 1 x"), (Warning, "braces {kept}")]
+    assert [(record.level, record.message) for record in records] == [
+        (Info, "value 1 x"),
+        (Warning, "braces {kept}"),
+    ]
     assert records[0].timestamp_ns > 0
+
+
+def test_format_errors_are_logged_instead_of_raised(sink):
+    log = dml.get_logger("py.format_error")
+    log.info("{} {}", 1)
+    log.info("{:d}", "x")
+    messages = [record.message for record in records_of(sink, "py.format_error")]
+    assert messages[0].startswith("{} {} (format error: IndexError: ")
+    assert "args: (1,)" in messages[0]
+    assert messages[1].startswith("{:d} (format error: ValueError: ")
+
+
+def test_unprintable_message_is_logged_instead_of_raised(sink):
+    class Unprintable:
+        def __str__(self):
+            raise RuntimeError("no text")
+
+    dml.get_logger("py.unprintable").info(Unprintable())
+    messages = [record.message for record in records_of(sink, "py.unprintable")]
+    assert messages == ["(unprintable message: RuntimeError: no text)"]
+
+
+def test_keywords_may_be_named_like_the_parameters(sink):
+    dml.get_logger("py.keywords").info("{message}", message="hi")
+    dml.log(Info, "{level}", level=3)
+    records = [(record.logger_name, record.message) for record in sink.drain()]
+    assert ("py.keywords", "hi") in records
+    assert (dml.get_default_logger().name, "3") in records
+
+
+def test_surrogates_are_escaped(sink):
+    dml.get_logger("py.surrogates").info("bad \udc80 name")
+    assert [record.message for record in records_of(sink, "py.surrogates")] == ["bad \\udc80 name"]
+
+
+def test_levels_are_ordered():
+    assert Debug < Info < Warning < Error < dml.LogLevel.Fatal
+    assert sorted(reversed(dml.log_levels)) == list(dml.log_levels)
+
+
+def test_handles_of_one_name_are_equal():
+    first = dml.get_logger("py.equal")
+    second = dml.get_logger("py.equal")
+    assert first == second
+    assert hash(first) == hash(second)
+    assert first != dml.get_logger("py.other")
+    assert {first: "value"}[second] == "value"
+    assert repr(dml.Default) == "Default"
 
 
 def test_disabled_record_is_not_formatted():
@@ -94,7 +145,10 @@ def test_free_functions_use_the_default_logger(sink):
     dml.info("default {}", 1)
     dml.log(Error, "default {}", 2)
     records = records_of(sink, dml.get_default_logger().name)
-    assert [(record.level, record.message) for record in records] == [(Info, "default 1"), (Error, "default 2")]
+    assert [(record.level, record.message) for record in records] == [
+        (Info, "default 1"),
+        (Error, "default 2"),
+    ]
 
 
 def test_detached_sink_receives_nothing():
@@ -121,7 +175,11 @@ def test_full_sink_drops_the_oldest_records():
 def test_threads_log_while_the_main_thread_drains(sink):
     log = dml.get_logger("py.threads")
     threads = [
-        threading.Thread(target=lambda index=index: [log.info("thread {} record {}", index, i) for i in range(500)])
+        threading.Thread(
+            target=lambda index=index: [
+                log.info("thread {} record {}", index, i) for i in range(500)
+            ]
+        )
         for index in range(8)
     ]
     for thread in threads:

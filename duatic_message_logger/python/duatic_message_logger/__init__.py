@@ -3,8 +3,9 @@
 """
 Python bindings of duatic_message_logger.
 
-Python and the C++ code of a process share one logger registry: loggers of the same name are the same logger, and
-level settings made here also apply to the C++ loggers (e.g. the DuaDrive SDK), and the other way round.
+Python and the C++ code of a process share one logger registry: loggers of the same name are the
+same logger, and level settings made here also apply to the C++ loggers (e.g. the DuaDrive SDK),
+and the other way round.
 
     import duatic_message_logger as dml
 
@@ -17,10 +18,10 @@ level settings made here also apply to the C++ loggers (e.g. the DuaDrive SDK), 
     for record in sink.drain():
         print(record.logger_name, record.message)
 
-    dml.bridge_python_logging()  # also send records of Python's logging module to the loggers of the same name
+    dml.bridge_python_logging()  # records of Python's logging module go to the same loggers
 
-Records go to ROS 2 logging when the process has it loaded, to stdout otherwise. The output is chosen at the first
-record, so import rclpy before logging the first record.
+Records go to ROS 2 logging when the process has it loaded, to stdout otherwise. The output is
+chosen at the first record, so import rclpy before logging the first record.
 """
 
 from ._bindings import (

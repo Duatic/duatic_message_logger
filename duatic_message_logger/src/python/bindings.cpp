@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -132,26 +133,66 @@ private:
   std::uint64_t dropped_{ 0 };
 };
 
-/// Formats @p message with str.format, only when there are arguments, and logs it without the GIL.
+/// Returns the UTF-8 text of @p text; characters UTF-8 cannot hold (lone surrogates) become backslash escapes.
+std::string to_utf8(const py::handle& text)
+{
+  return py::bytes(text.attr("encode")("utf-8", "backslashreplace")).cast<std::string>();
+}
+
+/// Returns "<ExceptionType>: <message>" of a caught Python exception.
+std::string describe(const py::error_already_set& error)
+{
+  return to_utf8(py::str(error.type().attr("__name__"))) + ": " + to_utf8(py::str(error.value()));
+}
+
+/**
+ * Returns @p message, formatted with str.format when there are arguments.
+ *
+ * A log call must not fail its caller, so an error never raises: the record keeps the raw message and names the error.
+ */
+std::string format_message(const py::object& message, const py::args& args, const py::kwargs& kwargs)
+{
+  py::str text;
+  try {
+    text = py::str(message);
+  } catch (const py::error_already_set& error) {
+    return "(unprintable message: " + describe(error) + ")";
+  }
+  if (args.empty() && kwargs.empty()) {
+    return to_utf8(text);
+  }
+  try {
+    return to_utf8(text.attr("format")(*args, **kwargs));
+  } catch (const py::error_already_set& error) {
+    return to_utf8(text) + " (format error: " + describe(error) + "; args: " + to_utf8(py::repr(args)) +
+           ", kwargs: " + to_utf8(py::repr(kwargs)) + ")";
+  }
+}
+
+/// Formats @p message only if the level passes, and logs it without the GIL.
 void log_message(const Logger& logger, LogLevel level, const py::object& message, const py::args& args,
                  const py::kwargs& kwargs)
 {
   if (!logger.should_log(level)) {
     return;
   }
-  py::str text(message);
-  if (!args.empty() || !kwargs.empty()) {
-    text = py::str(text.attr("format")(*args, **kwargs));
-  }
-  const auto utf8 = text.cast<std::string>();
+  const auto text = format_message(message, args, kwargs);
   const py::gil_scoped_release release;
-  logger.log(level, "{}", utf8);
+  logger.log(level, "{}", text);
+}
+
+/// Logs through a copy of the default logger, taken with the GIL held: another thread may replace the default
+/// logger once the GIL is released.
+void log_to_default(LogLevel level, const py::object& message, const py::args& args, const py::kwargs& kwargs)
+{
+  const Logger logger = get_default_logger();
+  log_message(logger, level, message, args, kwargs);
 }
 
 template <LogLevel Level>
 void log_default(const py::object& message, const py::args& args, const py::kwargs& kwargs)
 {
-  log_message(get_default_logger(), Level, message, args, kwargs);
+  log_to_default(Level, message, args, kwargs);
 }
 
 template <LogLevel Level>
@@ -167,10 +208,11 @@ PYBIND11_MODULE(_bindings, m)
 {
   using namespace duatic::message_logger;          // NOLINT(build/namespaces)
   using namespace duatic::message_logger::python;  // NOLINT(build/namespaces)
+  using impl::spdlog_logger;
 
   m.doc() = "Python bindings of duatic_message_logger";
 
-  py::enum_<LogLevel>(m, "LogLevel", "The log levels, the same as in ROS 2.")
+  py::enum_<LogLevel>(m, "LogLevel", py::arithmetic(), "The log levels, the same as in ROS 2, ordered by severity.")
       .value("Debug", LogLevel::Debug)
       .value("Info", LogLevel::Info)
       .value("Warning", LogLevel::Warning)
@@ -189,33 +231,48 @@ PYBIND11_MODULE(_bindings, m)
   m.def("parse_level", &parse_level, py::arg("text"),
         "Returns the level named text (case insensitive, also 'warn'), or None if it names none.");
 
-  py::class_<DefaultLevelTag>(m, "DefaultLevelTag", "The type of Default.");
+  py::class_<DefaultLevelTag>(m, "DefaultLevelTag", "The type of Default.")
+      .def("__repr__", [](const DefaultLevelTag& /*tag*/) { return "Default"; });
   m.attr("Default") = py::cast(Default);
 
-  py::class_<Logger>(m, "Logger", "Handle to a registered logger; copies refer to the same logger.")
+  // level and message are unnamed, so they are positional and keywords of any name go to the format
+  constexpr const char* log_doc = "log(level, message, *args, **kwargs): logs message.format(*args, **kwargs) at the "
+                                  "level, or the message as it is without arguments. Formats only if the level "
+                                  "passes; a format error is logged with the record instead of raised.";
+
+  py::class_<Logger>(m, "Logger", "Handle to a registered logger; handles of one name compare equal.")
       .def_property_readonly("name", &Logger::name)
       .def("should_log", &Logger::should_log, py::arg("level"),
            "Returns whether a record of the level passes the logger's level.")
-      .def("log", &log_message, py::arg("level"), py::arg("message"),
-           "Logs message.format(*args, **kwargs) at the level; formats only if the level passes.")
-      .def("debug", &log_with<LogLevel::Debug>, py::arg("message"))
-      .def("info", &log_with<LogLevel::Info>, py::arg("message"))
-      .def("warning", &log_with<LogLevel::Warning>, py::arg("message"))
-      .def("error", &log_with<LogLevel::Error>, py::arg("message"))
-      .def("fatal", &log_with<LogLevel::Fatal>, py::arg("message"))
+      .def("log", &log_message, py::arg(), py::arg(), log_doc)
+      .def("debug", &log_with<LogLevel::Debug>, py::arg(),
+           "debug(message, *args, **kwargs): logs at Debug, like log().")
+      .def("info", &log_with<LogLevel::Info>, py::arg(), "info(message, *args, **kwargs): logs at Info, like log().")
+      .def("warning", &log_with<LogLevel::Warning>, py::arg(),
+           "warning(message, *args, **kwargs): logs at Warning, like log().")
+      .def("error", &log_with<LogLevel::Error>, py::arg(),
+           "error(message, *args, **kwargs): logs at Error, like log().")
+      .def("fatal", &log_with<LogLevel::Fatal>, py::arg(),
+           "fatal(message, *args, **kwargs): logs at Fatal, like log().")
+      .def(
+          "__eq__",
+          [](const Logger& logger, const Logger& other) { return spdlog_logger(logger) == spdlog_logger(other); },
+          py::is_operator())
+      .def("__hash__", [](const Logger& logger) { return std::hash<spdlog::logger*>{}(spdlog_logger(logger).get()); })
       .def("__repr__", [](const Logger& logger) { return "<Logger '" + logger.name() + "'>"; });
 
-  m.def(
-      "log",
-      [](LogLevel level, const py::object& message, const py::args& args, const py::kwargs& kwargs) {
-        log_message(get_default_logger(), level, message, args, kwargs);
-      },
-      py::arg("level"), py::arg("message"), "Logs through the default logger, like Logger.log().");
-  m.def("debug", &log_default<LogLevel::Debug>, py::arg("message"));
-  m.def("info", &log_default<LogLevel::Info>, py::arg("message"));
-  m.def("warning", &log_default<LogLevel::Warning>, py::arg("message"));
-  m.def("error", &log_default<LogLevel::Error>, py::arg("message"));
-  m.def("fatal", &log_default<LogLevel::Fatal>, py::arg("message"));
+  m.def("log", &log_to_default, py::arg(), py::arg(),
+        "log(level, message, *args, **kwargs): logs through the default logger, like Logger.log().");
+  m.def("debug", &log_default<LogLevel::Debug>, py::arg(),
+        "debug(message, *args, **kwargs): logs at Debug through the default logger.");
+  m.def("info", &log_default<LogLevel::Info>, py::arg(),
+        "info(message, *args, **kwargs): logs at Info through the default logger.");
+  m.def("warning", &log_default<LogLevel::Warning>, py::arg(),
+        "warning(message, *args, **kwargs): logs at Warning through the default logger.");
+  m.def("error", &log_default<LogLevel::Error>, py::arg(),
+        "error(message, *args, **kwargs): logs at Error through the default logger.");
+  m.def("fatal", &log_default<LogLevel::Fatal>, py::arg(),
+        "fatal(message, *args, **kwargs): logs at Fatal through the default logger.");
 
   m.def("get_logger", &get_logger, py::arg("name"),
         "Returns the registered logger of the name, creating it on first use; the C++ code shares it.");
@@ -248,12 +305,13 @@ PYBIND11_MODULE(_bindings, m)
       .def_readonly("message", &LogRecord::message)
       .def_readonly("timestamp_ns", &LogRecord::timestamp_ns, "Time of the record, in ns since the Unix epoch.")
       .def("__repr__", [](const LogRecord& record) {
-        return "<LogRecord " + std::string(to_string(record.level)) + " '" + record.logger_name + "': " +
-               record.message + ">";
+        return "<LogRecord " + std::string(to_string(record.level)) + " '" + record.logger_name +
+               "': " + record.message + ">";
       });
 
-  py::class_<QueueSink, std::shared_ptr<QueueSink>>(
-      m, "QueueSink", "Keeps the records for a GUI, which drains them from its own timer; drops the oldest when full.")
+  py::class_<QueueSink, std::shared_ptr<QueueSink>>(m, "QueueSink",
+                                                    "Keeps the records for a GUI, which drains them from its own "
+                                                    "timer; drops the oldest when full.")
       .def(py::init<std::size_t>(), py::arg("capacity") = 10000)
       .def("drain", &QueueSink::drain, py::call_guard<py::gil_scoped_release>(),
            "Returns the records collected since the last call, oldest first.")

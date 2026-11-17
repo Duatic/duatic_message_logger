@@ -10,7 +10,7 @@ find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(rcutils REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11_vendor REQUIRED)
 find_package(pybind11 REQUIRED)
 
@@ -64,14 +64,23 @@ install(
 # Python bindings: the package duatic_message_logger with the extension module _bindings. The build tree gets the same
 # layout, so the tests import it from there.
 set(PYTHON_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/python)
-file(GLOB PYTHON_SOURCES CONFIGURE_DEPENDS python/${PROJECT_NAME}/*.py)
 pybind11_add_module(_bindings src/python/bindings.cpp)
 target_link_libraries(_bindings PRIVATE duatic_message_logger)
 target_compile_options(_bindings PRIVATE -Wall -Wextra -Werror=return-type)
 set_target_properties(_bindings PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PYTHON_BUILD_DIR}/${PROJECT_NAME})
-add_custom_command(TARGET _bindings POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PYTHON_SOURCES} ${PYTHON_BUILD_DIR}/${PROJECT_NAME}
-)
+# Copies each Python source into the build tree whenever it changes
+file(GLOB PYTHON_SOURCES CONFIGURE_DEPENDS python/${PROJECT_NAME}/*.py)
+set(PYTHON_BUILD_SOURCES "")
+foreach(source ${PYTHON_SOURCES})
+  get_filename_component(source_name ${source} NAME)
+  set(copy ${PYTHON_BUILD_DIR}/${PROJECT_NAME}/${source_name})
+  add_custom_command(OUTPUT ${copy}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${source} ${copy}
+    DEPENDS ${source}
+  )
+  list(APPEND PYTHON_BUILD_SOURCES ${copy})
+endforeach()
+add_custom_target(${PROJECT_NAME}_python_sources ALL DEPENDS ${PYTHON_BUILD_SOURCES})
 ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR python/${PROJECT_NAME})
 install(TARGETS _bindings LIBRARY DESTINATION ${PYTHON_INSTALL_DIR}/${PROJECT_NAME})
 
@@ -90,7 +99,7 @@ if(BUILD_TESTING)
 
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_python test/python
-    ENV PYTHONPATH=${PYTHON_BUILD_DIR}
+    ENV PYTHONPATH=${PYTHON_BUILD_DIR} PYTHONDONTWRITEBYTECODE=1
   )
 endif()
 

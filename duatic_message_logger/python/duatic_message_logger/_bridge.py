@@ -29,8 +29,8 @@ class LoggingHandler(logging.Handler):
     """
     Logs each record of Python's logging module through the duatic logger of the same name.
 
-    The duatic logger's level decides as well: a record below it is dropped before it is formatted. The message is the
-    handler's formatted record, by default the message with any traceback.
+    The duatic logger's level decides as well: a record below it is dropped before it is formatted.
+    The message is the handler's formatted record, by default the message with any traceback.
     """
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -47,8 +47,8 @@ def bridge_python_logging(logger: Optional[logging.Logger] = None) -> LoggingHan
     """
     Adds a LoggingHandler to a logger of Python's logging module, the root logger by default.
 
-    The logger is set to DEBUG, so the duatic levels decide what is logged. Calling it again for the same logger
-    returns the handler already added.
+    The logger is set to DEBUG, so the duatic levels decide what is logged. Calling it again for the
+    same logger returns the handler already added.
     """
     target = logger if logger is not None else logging.getLogger()
     target.setLevel(logging.DEBUG)

@@ -340,7 +340,8 @@ dml.detach_sink(sink)  # when the view closes
 
 **Python's logging module**: `bridge_python_logging()` adds a `LoggingHandler` to the root logger (or the logger
 passed), which logs every record through the duatic logger of the same name; the root logger maps to the default
-logger. It sets that logger to `DEBUG`, so the duatic levels decide.
+logger. It sets that logger to `DEBUG`, so the duatic levels decide; other handlers on that logger then also see
+the DEBUG records of all libraries.
 
 ```python
 import logging
@@ -349,7 +350,11 @@ dml.bridge_python_logging()
 logging.getLogger("duatic.my_tool").info("value %s", 1)  # logged by duatic.my_tool
 ```
 
+A log call never raises: a format error is logged with the record, e.g. `{} {} (format error: IndexError: …)`.
+
 The output is chosen at the first record: import `rclpy` before the first record so the records go to ROS 2 logging.
+Without ROS the records go to the C `stdout`, which Python's own `sys.stdout` buffers separately, so the order of
+`print()` and log output may differ when stdout is not a terminal.
 
 # Contributing
 
