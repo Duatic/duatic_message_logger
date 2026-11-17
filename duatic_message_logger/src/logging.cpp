@@ -37,7 +37,7 @@
 namespace duatic::message_logger
 {
 
-[[nodiscard]] std::optional<LogLevel> parse_level_from_string(std::string_view text) noexcept
+[[nodiscard]] std::optional<LogLevel> parse_level(std::string_view text) noexcept
 {
   const auto lower = [](char c) noexcept { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; };
   const auto matches = [&](std::string_view name) noexcept {
@@ -55,32 +55,20 @@ namespace duatic::message_logger
   return std::nullopt;
 }
 
-std::ostream& operator<<(std::ostream& os, const LogLevel level)
+std::ostream& operator<<(std::ostream& os, LogLevel level)
 {
-  switch (level) {
-    case LogLevel::Debug:
-      return os << "Debug";
-    case LogLevel::Info:
-      return os << "Info";
-    case LogLevel::Warning:
-      return os << "Warning";
-    case LogLevel::Error:
-      return os << "Error";
-    case LogLevel::Fatal:
-      return os << "Fatal";
-  }
-  return os << "Invalid LogLevel";
+  return os << to_string(level);
 }
 
 namespace
 {
 
-// The default sink and the logger registry are created on first use and are deliberately never destroyed, so logging
-// stays safe during static destruction.
+// The sinks and the logger registry are created on first use and are deliberately never destroyed, so logging stays
+// safe during static destruction.
 
-// Forwards to the output and the attached sinks. It is rebuilt in one step on every change, so there is never a moment
-// without an output.
-struct DefaultSink
+// The output and the attached sinks, behind the one forwarding sink all registered loggers write to. It is rebuilt in
+// one step on every change, so there is never a moment without an output.
+struct Sinks
 {
   std::mutex mutex;
   spdlog::sink_ptr output{ std::make_shared<detail::RcutilsSink>() };
@@ -91,16 +79,16 @@ struct DefaultSink
   // Requires mutex
   void rebuild()
   {
-    std::vector<spdlog::sink_ptr> sinks{ output };
-    sinks.insert(sinks.end(), attached.begin(), attached.end());
-    forwarding->set_sinks(std::move(sinks));
+    std::vector<spdlog::sink_ptr> all{ output };
+    all.insert(all.end(), attached.begin(), attached.end());
+    forwarding->set_sinks(std::move(all));
   }
 };
 
-DefaultSink& default_sink()
+Sinks& sinks()
 {
-  static DefaultSink& sink{ *new DefaultSink{} };
-  return sink;
+  static Sinks& state{ *new Sinks{} };
+  return state;
 }
 
 // The Default level until set_level(Default, ...) is called
@@ -133,7 +121,7 @@ public:
     const std::lock_guard lock(mutex_);
     auto [it, inserted] = loggers_.try_emplace(name);
     if (inserted) {
-      it->second = std::make_shared<spdlog::logger>(name, default_sink().forwarding);
+      it->second = std::make_shared<spdlog::logger>(name, sinks().forwarding);
       it->second->set_level(impl::to_spdlog(resolve(name)));
     }
     return Logger(it->second);
@@ -145,14 +133,14 @@ public:
     return default_logger_;
   }
 
-  void set_level(const std::string& name, const LogLevel level)
+  void set_level(const std::string& name, LogLevel level)
   {
     const std::lock_guard lock(mutex_);
     levels_[name] = level;
     apply_levels();
   }
 
-  void set_default_level(const LogLevel level)
+  void set_default_level(LogLevel level)
   {
     const std::lock_guard lock(mutex_);
     default_level_ = level;
@@ -245,8 +233,8 @@ namespace impl
 
 LogStream::~LogStream()
 {
-  if (oss_) {
-    logger_->log(to_spdlog(level_), oss_->str());
+  if (record_) {
+    record_->logger->log(to_spdlog(level_), record_->stream.str());
   }
 }
 }  // namespace impl
@@ -256,31 +244,21 @@ Logger get_logger(const std::string& name)
   check_name(name);
   return registry().get_logger(name);
 }
-Logger get_logger_with_default_sink(const std::string& name)
-{
-  return get_logger(name);
-}
 const Logger& get_default_logger()
 {
   return registry().default_logger();
 }
-void configure_logger(const Logger& logger)
+void set_default_logger(const Logger& logger)
 {
   registry().default_logger() = logger;
 }
-void configure_logger_with_default_sink(const Logger& logger)
-{
-  auto copy = std::make_shared<spdlog::logger>(impl::spdlog_logger(logger));
-  copy->sinks().push_back(default_sink().forwarding);
-  registry().default_logger() = Logger(std::move(copy));
-}
 
-void set_level(const std::string& name, const LogLevel level)
+void set_level(const std::string& name, LogLevel level)
 {
   check_name(name);
   registry().set_level(name, level);
 }
-void set_level(DefaultLevelTag, const LogLevel level)
+void set_level(DefaultLevelTag, LogLevel level)
 {
   registry().set_default_level(level);
 }
@@ -311,15 +289,11 @@ LogLevel get_effective_level(DefaultLevelTag)
 {
   return registry().default_level().value_or(built_in_default_level);
 }
-void configure_level(const LogLevel maximum_log_level)
-{
-  set_level(Default, maximum_log_level);
-}
 
-void set_default_sink(spdlog::sink_ptr sink)
+void set_output_sink(spdlog::sink_ptr sink)
 {
   check_sink(sink);
-  auto& state = default_sink();
+  auto& state = sinks();
   const std::lock_guard lock(state.mutex);
   state.output = std::move(sink);
   state.rebuild();
@@ -327,7 +301,7 @@ void set_default_sink(spdlog::sink_ptr sink)
 void attach_sink(spdlog::sink_ptr sink)
 {
   check_sink(sink);
-  auto& state = default_sink();
+  auto& state = sinks();
   const std::lock_guard lock(state.mutex);
   if (std::ranges::find(state.attached, sink) != state.attached.end()) {
     return;
@@ -337,7 +311,7 @@ void attach_sink(spdlog::sink_ptr sink)
 }
 void detach_sink(const spdlog::sink_ptr& sink)
 {
-  auto& state = default_sink();
+  auto& state = sinks();
   const std::lock_guard lock(state.mutex);
   const auto it = std::ranges::find(state.attached, sink);
   if (it == state.attached.end()) {

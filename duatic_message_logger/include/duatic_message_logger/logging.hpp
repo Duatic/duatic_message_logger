@@ -49,15 +49,17 @@
  * - A level setting for a name applies to that name and to every name below it: "a" covers "a.b" and "a.b.c", but not
  *   "ab", as in ROS 2. Where no setting matches, the Default level applies (Info until set). The Default level is not
  *   the level of the default logger, which is set by its name like any other logger.
- * - Registered loggers write to the default sink. It forwards every record to one output (set_default_sink, by default
- *   ROS 2 logging when the process has it loaded, stdout otherwise) and to any number of attached sinks (attach_sink).
+ * - Registered loggers write every record to one output (set_output_sink; by default ROS 2 logging when the process has
+ *   it loaded, stdout otherwise) and to any number of attached sinks (attach_sink).
  * - Loggers decide, sinks are destinations: a record is filtered once, by its logger's level, and every sink receives
  *   all records that passed. Keep sinks at their default level (trace) and filter only for display.
+ * - Sinks run on the logging thread while the sinks are locked: a sink must not log through a registered logger (that
+ *   deadlocks), and should hand records to another thread instead of doing slow work.
  */
 namespace duatic::message_logger
 {
 
-// We support the same log levels as ROS2
+/// @brief The log levels, the same as in ROS 2.
 enum class LogLevel
 {
   Debug,
@@ -72,9 +74,9 @@ inline constexpr std::array<LogLevel, 5> log_levels{ LogLevel::Debug, LogLevel::
                                                      LogLevel::Error, LogLevel::Fatal };
 
 /**
- * @brief The name of a level as parse_level_from_string() accepts it: debug, info, warning, error or fatal.
+ * @brief Returns the name of @p level as parse_level() accepts it: debug, info, warning, error or fatal.
  */
-[[nodiscard]] constexpr std::string_view to_string(const LogLevel level) noexcept
+[[nodiscard]] constexpr std::string_view to_string(LogLevel level) noexcept
 {
   switch (level) {
     case LogLevel::Debug:
@@ -92,19 +94,20 @@ inline constexpr std::array<LogLevel, 5> log_levels{ LogLevel::Debug, LogLevel::
 }
 
 /**
- * @brief parse the LogLevel from the given string
- * @note accepts the names to_string() returns, case insensitive, and "warn"
+ * @brief Returns the level named @p text, or nothing if it names none.
+ * @note Accepts the names to_string() returns, case insensitive, and "warn".
  */
-[[nodiscard]] std::optional<LogLevel> parse_level_from_string(std::string_view text) noexcept;
+[[nodiscard]] std::optional<LogLevel> parse_level(std::string_view text) noexcept;
 
-std::ostream& operator<<(std::ostream& os, const LogLevel level);
+/// @brief Writes the name to_string() returns.
+std::ostream& operator<<(std::ostream& os, LogLevel level);
 
 class Logger;
 
 namespace impl
 {
 
-constexpr spdlog::level::level_enum to_spdlog(const LogLevel level) noexcept
+constexpr spdlog::level::level_enum to_spdlog(LogLevel level) noexcept
 {
   switch (level) {
     case LogLevel::Debug:
@@ -121,7 +124,7 @@ constexpr spdlog::level::level_enum to_spdlog(const LogLevel level) noexcept
   return spdlog::level::info;
 }
 
-spdlog::logger& spdlog_logger(const Logger& logger) noexcept;
+const std::shared_ptr<spdlog::logger>& spdlog_logger(const Logger& logger) noexcept;
 
 class LogStream;
 
@@ -154,7 +157,7 @@ public:
   }
 
   /// @brief Returns whether a record of @p level passes the logger's level.
-  [[nodiscard]] bool should_log(const LogLevel level) const noexcept
+  [[nodiscard]] bool should_log(LogLevel level) const noexcept
   {
     return logger_->should_log(impl::to_spdlog(level));
   }
@@ -182,7 +185,7 @@ public:
   impl::LogStream fatal() const;
 
 private:
-  friend spdlog::logger& impl::spdlog_logger(const Logger& logger) noexcept;
+  friend const std::shared_ptr<spdlog::logger>& impl::spdlog_logger(const Logger& logger) noexcept;
 
   std::shared_ptr<spdlog::logger> logger_;
 };
@@ -190,9 +193,9 @@ private:
 namespace impl
 {
 
-inline spdlog::logger& spdlog_logger(const Logger& logger) noexcept
+inline const std::shared_ptr<spdlog::logger>& spdlog_logger(const Logger& logger) noexcept
 {
-  return *logger.logger_;
+  return logger.logger_;
 }
 
 }  // namespace impl
@@ -255,7 +258,7 @@ private:
 };
 
 /**
- * @brief obtain the currently configured default logger
+ * @brief Returns the default logger, which the calls without a logger use.
  */
 [[nodiscard]] const Logger& get_default_logger();
 
@@ -266,42 +269,51 @@ namespace impl
 class LogStream
 {
 public:
-  LogStream(const Logger& logger, LogLevel level) : logger_(&spdlog_logger(logger)), level_(level)
+  LogStream(const Logger& logger, LogLevel level) : level_(level)
   {
     if (logger.should_log(level)) {
-      oss_.emplace();
+      record_.emplace(spdlog_logger(logger));
     }
   }
 
   template <typename T>
   LogStream& operator<<(const T& value)
   {
-    if (oss_) {
-      *oss_ << value;
+    if (record_) {
+      record_->stream << value;
     }
     return *this;
   }
 
   LogStream& operator<<(std::ostream& (*manip)(std::ostream&))
   {
-    if (oss_) {
-      manip(*oss_);
+    if (record_) {
+      manip(record_->stream);
     }
     return *this;
   }
   LogStream& operator<<(std::ios_base& (*manip)(std::ios_base&))
   {
-    if (oss_) {
-      manip(*oss_);
+    if (record_) {
+      manip(record_->stream);
     }
     return *this;
   }
   ~LogStream();
 
 private:
-  spdlog::logger* logger_;
+  struct Record
+  {
+    explicit Record(std::shared_ptr<spdlog::logger> record_logger) : logger(std::move(record_logger))
+    {
+    }
+
+    std::shared_ptr<spdlog::logger> logger;  ///< Keeps the logger alive until the record is written
+    std::ostringstream stream;
+  };
+
   LogLevel level_;
-  std::optional<std::ostringstream> oss_;  ///< Only constructed when the record passes the logger's level
+  std::optional<Record> record_;  ///< Only constructed when the record passes the logger's level
 };
 
 }  // namespace impl
@@ -558,29 +570,19 @@ inline impl::LogStream fatal(const Logger& logger)
 }
 
 /**
- * @brief obtain the registered logger with the given name, creating it on first use
- * @note the same name always returns the same logger; it writes to the default sink and follows the level settings
- * @throws std::invalid_argument if @p name is empty
+ * @brief Returns the registered logger of @p name, creating it on first use.
+ * @note The same name always returns the same logger. It writes to the output and the attached sinks, and follows the
+ * level settings.
+ * @throws std::invalid_argument if @p name is empty.
  */
 [[nodiscard]] Logger get_logger(const std::string& name);
 
 /**
- * @brief obtain a named logger configured to use the default sink
+ * @brief Sets the default logger, which the calls without a logger use.
+ * @note A registered logger keeps following the level settings, a custom logger keeps its own level and sinks.
+ * @note Not synchronized with logging; call it before other threads log through the default logger.
  */
-[[deprecated("use get_logger"), nodiscard]] Logger get_logger_with_default_sink(const std::string& name);
-
-/**
- * @brief configure the default logger which is used if no logger is passed to the functions
- * @note a registered logger keeps following the level settings, a custom logger keeps its own level and sinks
- * @note not synchronized with logging; call it before other threads log through the default logger
- */
-void configure_logger(const Logger& logger);
-/**
- * @brief configure a copy of the given logger, with the default sink added, as the default logger
- * @note the copy is a custom logger: it keeps the level of @p logger
- * @note not synchronized with logging; call it before other threads log through the default logger
- */
-void configure_logger_with_default_sink(const Logger& logger);
+void set_default_logger(const Logger& logger);
 
 /// @brief Selects the Default level in the level functions, e.g. set_level(Default, LogLevel::Debug).
 struct DefaultLevelTag
@@ -599,69 +601,66 @@ struct DefaultLevelTag
 inline constexpr DefaultLevelTag Default{ DefaultLevelTag::Construct::token };
 
 /**
- * @brief set the level of a name and of every name below it
- * @throws std::invalid_argument if @p name is empty
+ * @brief Sets the level of @p name and of every name below it.
+ * @throws std::invalid_argument if @p name is empty.
  */
 void set_level(const std::string& name, LogLevel level);
 /**
- * @brief set the Default level, used by registered loggers that no name setting covers
+ * @brief Sets the Default level, used by the registered loggers that no name setting covers.
  */
 void set_level(DefaultLevelTag, LogLevel level);
 
 /**
- * @brief remove the setting of a name, so it inherits again
- * @throws std::invalid_argument if @p name is empty
+ * @brief Removes the setting of @p name, so it inherits again.
+ * @throws std::invalid_argument if @p name is empty.
  */
 void reset_level(const std::string& name);
 /**
- * @brief remove the Default level setting, which brings back Info
+ * @brief Removes the Default level setting, which brings back Info.
  */
 void reset_level(DefaultLevelTag);
 
 /**
- * @brief obtain the level set for exactly this name, if any
- * @throws std::invalid_argument if @p name is empty
+ * @brief Returns the level set for exactly @p name, if any.
+ * @throws std::invalid_argument if @p name is empty.
  */
 [[nodiscard]] std::optional<LogLevel> get_level(const std::string& name);
 /**
- * @brief obtain the Default level, if one was set
+ * @brief Returns the Default level, if one was set.
  */
 [[nodiscard]] std::optional<LogLevel> get_level(DefaultLevelTag);
 
 /**
- * @brief obtain the level a registered logger of this name uses
- * @throws std::invalid_argument if @p name is empty
+ * @brief Returns the level a registered logger of @p name uses.
+ * @throws std::invalid_argument if @p name is empty.
  */
 [[nodiscard]] LogLevel get_effective_level(const std::string& name);
 /**
- * @brief obtain the Default level in force: the one set, or Info
+ * @brief Returns the Default level in force: the one set, or Info.
  */
 [[nodiscard]] LogLevel get_effective_level(DefaultLevelTag);
 
 /**
- * @brief configure the level of all registered loggers
+ * @brief Replaces the output of the registered loggers.
+ * @note By default the output is ROS 2 logging when the process has rcutils loaded, stdout otherwise.
+ * @note Applies to loggers created before the call as well; attached sinks stay attached.
+ * @throws std::invalid_argument if @p sink is null.
  */
-[[deprecated("use set_level(Default, level)")]] void configure_level(const LogLevel maximum_log_level);
+void set_output_sink(spdlog::sink_ptr sink);
 
 /**
- * @brief replace the output of the default sink
- * @note by default it goes to ROS 2 logging when the process has rcutils loaded, to stdout otherwise
- * @note applies to loggers created before the call as well; attached sinks stay attached
- * @throws std::invalid_argument if @p sink is null
- */
-void set_default_sink(spdlog::sink_ptr sink);
-
-/**
- * @brief also forward every record written to the default sink to @p sink
- * @note applies to loggers created before the call as well; attaching an attached sink again has no effect, attaching
- * the current output delivers its records twice
- * @throws std::invalid_argument if @p sink is null
+ * @brief Also forwards every record of the registered loggers to @p sink.
+ * @note Applies to loggers created before the call as well. Attaching an attached sink again has no effect; attaching
+ * the output delivers its records twice.
+ * @note @p sink is called on the logging thread while the sinks are locked: it must not log through a registered
+ * logger, and should queue records for another thread (in Qt, connect with Qt::QueuedConnection).
+ * @throws std::invalid_argument if @p sink is null.
  */
 void attach_sink(spdlog::sink_ptr sink);
 
 /**
- * @brief stop forwarding to a sink attached with attach_sink()
- * @note once it returns, @p sink receives no further records; detaching a sink that is not attached has no effect
+ * @brief Stops forwarding to a sink attached with attach_sink().
+ * @note Once it returns, @p sink receives no further records. Detaching a sink that is not attached has no effect.
  */
 void detach_sink(const spdlog::sink_ptr& sink);
 

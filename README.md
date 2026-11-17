@@ -67,7 +67,7 @@ logging::log(logging::LogLevel::Info, "Info {}", 1);
 ## 3. named logger
 
 `get_logger(name)` returns the registered logger of that name; the same name always gives the same logger. It writes
-to the default sink and its level follows the level settings (see 8.).
+to the output and the attached sinks, and its level follows the level settings (see 8.).
 
 ```c++
 #include "duatic_message_logger/log.hpp"
@@ -104,7 +104,8 @@ set per subtree (see 8.).
 ## 4. custom logger
 
 A `Logger` built from your own spdlog logger keeps its own sinks and its own level, which you set on the spdlog
-logger; the level settings never touch it, and it does not write to the default sink.
+logger; the level settings never touch it, and it writes only to its own sinks, not to the output or the attached
+sinks.
 
 ```c++
 #include "duatic_message_logger/log.hpp"
@@ -134,12 +135,11 @@ logger named `global_logger`. A program can make another logger the default, at 
 
 ```c++
   // A registered logger: the default logger is now "duatic.my_tool"
-  logging::configure_logger(logging::get_logger("duatic.my_tool"));
+  logging::set_default_logger(logging::get_logger("duatic.my_tool"));
   logging::info("Info {}", 1);  // logged by duatic.my_tool
 
-  // A custom logger, here also writing to the default sink: a copy of it, with the default sink added, becomes the
-  // default logger; the copy keeps the level of the custom logger
-  logging::configure_logger_with_default_sink(logger);
+  // Or the custom logger from above, with its own sinks and level
+  logging::set_default_logger(logger);
 
   const logging::Logger& current = logging::get_default_logger();
 ```
@@ -204,8 +204,8 @@ duatic::message_logger::debug("Debug {}", 1);
 
 ```
  get_logger("duatic.duadrive.1234") ─┐  level from the level settings, stored on the logger
- get_logger("duatic.ecat.eth0")     ─┼─► default sink ─┬─► output:   ROS 2 logging when loaded, stdout otherwise
- get_default_logger()               ─┘                 │             (or anything set_default_sink() chose)
+ get_logger("duatic.ecat.eth0")     ─┼─► sinks ────────┬─► output:   ROS 2 logging when loaded, stdout otherwise
+ get_default_logger()               ─┘                 │             (or anything set_output_sink() chose)
                                                        └─► attached: e.g. a GUI log view (attach_sink / detach_sink)
 ```
 
@@ -232,14 +232,14 @@ logging::get_effective_level("duatic.ecat.eth0");  // the level a logger of this
 Typical use in a command line tool:
 
 ```c++
-const auto level = logging::parse_level_from_string(argument);  // debug, info, warning (or warn), error, fatal
+const auto level = logging::parse_level(argument);  // debug, info, warning (or warn), error, fatal
 if (!level) {
   // report the valid names: logging::to_string(l) for each l in logging::log_levels
 }
 logging::set_level(logging::Default, *level);
 ```
 
-**Sinks**: `set_default_sink()` replaces the output, also for loggers created before the call; attached sinks stay.
+**Sinks**: `set_output_sink()` replaces the output, also for loggers created before the call; attached sinks stay.
 `attach_sink()` additionally forwards every record to another spdlog sink, and once `detach_sink()` returns, that sink
 receives nothing more. Both take any spdlog sink; use the thread safe `_mt` variants, as several threads log.
 
@@ -257,11 +257,13 @@ receives nothing more. Both take any spdlog sink; use the thread safe `_mt` vari
   logging::detach_sink(file);
 
   // Write to a colored console instead of ROS 2 logging / stdout
-  logging::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+  logging::set_output_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 ```
 
 A custom sink, e.g. a GUI log view, derives from `spdlog::sinks::base_sink`, which serializes the calls with its
-mutex. It is called on the logging thread, so hand records over instead of blocking there:
+mutex. Sinks run on the logging thread while the sinks are locked, so a sink must not log through a registered
+logger (that deadlocks) and should hand records to another thread instead of doing slow work there; in Qt, connect
+its signal with `Qt::QueuedConnection`, also for records logged on the GUI thread:
 
 ```c++
 #include <mutex>

@@ -110,12 +110,9 @@ void RcutilsSink::sink_it_(const spdlog::details::log_msg& msg)
   if (msg.level == spdlog::level::off) {
     return;
   }
-  if (get_output_handler_ == nullptr) {
-    const auto now = std::chrono::steady_clock::now();
-    if (now >= next_lookup_) {
-      next_lookup_ = now + lookup_period;
-      resolve();
-    }
+  if (!resolved_) {
+    resolved_ = true;
+    resolve();
   }
   const rcutils_logging_output_handler_t handler = get_output_handler_ != nullptr ? get_output_handler_() : nullptr;
   if (handler == nullptr) {

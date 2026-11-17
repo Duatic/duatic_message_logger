@@ -23,6 +23,11 @@
  */
 #include <gtest/gtest.h>
 
+#include <memory>
+#include <sstream>
+
+#include "spdlog/sinks/ostream_sink.h"
+
 // Test old melo style api
 #include "message_logger/message_logger.hpp"
 TEST(Logging, Melo)
@@ -30,4 +35,18 @@ TEST(Logging, Melo)
   MELO_INFO("{}", 1);
   MELO_INFO("Test");
   MELO_INFO_STREAM("ABC" << 1);
+}
+
+TEST(Logging, MeloFatalLogsAtFatal)
+{
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  sink->set_pattern("%l: %v");
+  duatic::message_logger::attach_sink(sink);
+
+  MELO_FATAL("fmt {}", 1);
+  MELO_FATAL_STREAM("stream " << 2);
+
+  duatic::message_logger::detach_sink(sink);
+  EXPECT_EQ(out.str(), "critical: fmt 1\ncritical: stream 2\n");
 }
