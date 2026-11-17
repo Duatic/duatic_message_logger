@@ -80,8 +80,8 @@
     }                                                                                                                  \
   } while (0);
 
-#define MELO_FATAL(...) duatic::message_logger::error(__VA_ARGS__);
-#define MELO_FATAL_STREAM(message) (duatic::message_logger::error() << message);
+#define MELO_FATAL(...) duatic::message_logger::fatal(__VA_ARGS__);
+#define MELO_FATAL_STREAM(message) (duatic::message_logger::fatal() << message);
 #define MELO_FATAL_THROTTLE_STREAM(rate, message)                                                                      \
   do {                                                                                                                 \
     static auto last_log_time = std::chrono::steady_clock::time_point::min();                                          \

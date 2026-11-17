@@ -3,20 +3,26 @@
 <package format="3">
   <name>duatic_message_logger</name>
   <version>2.0.0</version>
-  <description>A modern c++20 logging abstraction on spdlog, with no ROS dependency</description>
+  <description>A modern c++20 logging abstraction on spdlog, with no ROS dependency, and its Python bindings</description>
   <maintainer email="lnachtigall@duatic.com">Lennart Nachtigall</maintainer>
   <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>rcutils</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <depend>spdlog</depend>
   <depend>fmt</depend>
   <!-- Headers only, rcutils is looked up at runtime and not needed by installs -->
   <build_depend>rcutils</build_depend>
+  <build_depend>pybind11_vendor</build_depend>
+  <build_depend>python3-dev</build_depend>
+  <exec_depend>python3</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

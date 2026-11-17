@@ -42,12 +42,15 @@
 namespace duatic::message_logger::detail
 {
 /**
- * @brief Writes through the ROS 2 logging system when the process has it loaded, to stdout otherwise
+ * @brief Writes through the ROS 2 logging output when the process has it loaded, to stdout otherwise
+ *
+ * Records go straight to the current rcutils output handler (rcl's console and file outputs in a ROS 2 process),
+ * without a ROS level check: the levels of our loggers are decided by duatic_message_logger alone.
  *
  * Built against the rcutils headers, but the functions are looked up by name at runtime, so the library neither links
  * rcutils nor needs it installed.
- * Until they are found, the lookup is repeated at most once per lookup_period, so a process that loads ROS later
- * switches over.
+ * The lookup happens once, at the first record, so the logging path never touches the dynamic loader afterwards; a
+ * process that loads ROS only after its first record keeps writing to stdout.
  */
 class RcutilsSink : public spdlog::sinks::base_sink<std::mutex>
 {
@@ -61,22 +64,16 @@ protected:
   void set_formatter_(std::unique_ptr<spdlog::formatter> sink_formatter) override;
 
 private:
-  using RcutilsLog = decltype(&rcutils_log);
-  using RcutilsIsEnabledFor = decltype(&rcutils_logging_logger_is_enabled_for);
+  using RcutilsGetOutputHandler = decltype(&rcutils_logging_get_output_handler);
   using RcutilsInitialize = decltype(&rcutils_logging_initialize);
 
-  static constexpr std::chrono::seconds lookup_period{ 1 };  ///< Spacing of lookups while rcutils is not found
-
-  /// @brief Looks up the rcutils functions and initializes rcutils logging once they are found
+  /// @brief Looks up the rcutils functions and initializes rcutils logging if they are found
   void resolve();
 
-  /// @brief Writes a message ROS 2 has filtered out, in the rcutils console layout
-  static void write_fallback(const spdlog::details::log_msg& msg, const std::string& name);
-
   std::shared_ptr<spdlog::sinks::stdout_color_sink_st> stdout_;
-  RcutilsLog log_{ nullptr };
-  RcutilsIsEnabledFor enabled_{ nullptr };
-  std::chrono::steady_clock::time_point next_lookup_{};
+  // Looked up per record, as rcl installs its output handler at initialization, possibly after the lookup
+  RcutilsGetOutputHandler get_output_handler_{ nullptr };
+  bool resolved_{ false };  ///< Whether the lookup happened
 };
 
 }  // namespace duatic::message_logger::detail
