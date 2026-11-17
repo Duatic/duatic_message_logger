@@ -33,13 +33,17 @@ All dependencies with their corresponding version are listed in the [repos.list]
 
 ...
 
-logging::debug() << "Test" << std::endl;
-logging::info() << "Test" << std::endl;
-logging::warning() << "Test" << std::endl;
-logging::error() << "Test" << std::endl;
-logging::fatal() << "Test" << std::endl;
+logging::debug() << "Debug " << 1;
+logging::info() << "Info " << 1;
+logging::warning() << "Warning " << 1;
+logging::error() << "Error " << 1;
+logging::fatal() << "Fatal " << 1;
 
+// level chosen at runtime
+logging::log(logging::LogLevel::Info) << "Info " << 1;
 ```
+
+A record is one line; do not end it with `std::endl`, which adds an empty line.
 
 ## 2. global logger fmt style api
 
@@ -55,6 +59,9 @@ logging::info("Info {}", 1);
 logging::warning("Warning {}", 1);
 logging::error("Error {}", 1);
 logging::fatal("Fatal {}", 1);
+
+// level chosen at runtime
+logging::log(logging::LogLevel::Info, "Info {}", 1);
 ```
 
 ## 3. named logger
@@ -66,51 +73,94 @@ to the default sink and its level follows the level settings (see 8.).
 #include "duatic_message_logger/log.hpp"
 
 ...
-  logging::Logger logger = logging::get_logger("my_component");
+  // Copies share the logger; keep one as a member of your component
+  logging::Logger logger = logging::get_logger("duatic.my_component");
 
   // fmt style, see https://github.com/fmtlib/fmt for all formatting options
   logger.debug("Debug {}", 1);
   logger.info("Info {}", 1);
+  logger.warning("Warning {}", 1);
+  logger.error("Error {}", 1);
+  logger.fatal("Fatal {}", 1);
+  logger.log(logging::LogLevel::Info, "Info {}", 1);  // level chosen at runtime
 
-  // or streaming style
-  logger.warning() << "Test warning";
-  logger.error() << "Test error";
+  // or streaming style, also debug() ... fatal() and log(level)
+  logger.warning() << "Warning " << 1;
+
+  // a runtime string is passed as an argument, never as the format
+  const std::string message = read_message();
+  logger.info("{}", message);
+
+  // skip expensive work for records that would be dropped
+  if (logger.should_log(logging::LogLevel::Debug)) {
+    logger.debug("State: {}", dump_state());
+  }
 ```
 
 The free functions take the logger as first argument and do the same, e.g. `logging::info(logger, "Info {}", 1)` or
-`logging::error(logger) << "Test error"`.
+`logging::error(logger) << "Error " << 1`. Use dot separated names (`duatic.<component>.<instance>`), so levels can be
+set per subtree (see 8.).
 
 ## 4. custom logger
 
 A `Logger` built from your own spdlog logger keeps its own sinks and its own level, which you set on the spdlog
-logger; the level settings never touch it.
+logger; the level settings never touch it, and it does not write to the default sink.
 
 ```c++
 #include "duatic_message_logger/log.hpp"
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 ...
-  // Create a custom sink + logger (spdlog style)
-  auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-  sink->set_color_mode(spdlog::color_mode::always);
-  sink->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
-  logging::Logger logger{ std::make_shared<spdlog::logger>("custom", sink) };
+  // Create custom sinks + logger (spdlog style)
+  auto console = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  console->set_color_mode(spdlog::color_mode::always);
+  console->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
+  auto file = std::make_shared<spdlog::sinks::basic_file_sink_mt>("/tmp/custom.log");
 
-  logger.info("Info {}", 1);
-  logger.fatal() << "Test fatal";
+  // Keep the spdlog logger to change its level later
+  auto spdlog_logger = std::make_shared<spdlog::logger>("custom", spdlog::sinks_init_list{ console, file });
+  spdlog_logger->set_level(spdlog::level::debug);
+  logging::Logger logger{ spdlog_logger };
+
+  logger.debug("Debug {}", 1);
+  logger.fatal() << "Fatal " << 1;
+```
+
+### The default logger
+
+The calls without a logger (`logging::info(...)`, `logging::info() << ...`) use the default logger, a registered
+logger named `global_logger`. A program can make another logger the default, at startup before other threads log:
+
+```c++
+  // A registered logger: the default logger is now "duatic.my_tool"
+  logging::configure_logger(logging::get_logger("duatic.my_tool"));
+  logging::info("Info {}", 1);  // logged by duatic.my_tool
+
+  // A custom logger, here also writing to the default sink: a copy of it, with the default sink added, becomes the
+  // default logger; the copy keeps the level of the custom logger
+  logging::configure_logger_with_default_sink(logger);
+
+  const logging::Logger& current = logging::get_default_logger();
 ```
 
 ## 5. Throttled and one time messages
 
-Each fmt style call also takes a `LogThrottle` and the current time. The message is formatted and logged only on the first call and then at most once per period. Keep one throttle per message. A message below the logger's level does not count, so it still appears once the level is raised.
+Each fmt style call with a logger also takes a `LogThrottle` and the current time. The message is formatted and logged only on the first call and then at most once per period. Keep one throttle per message. A message below the logger's level does not count, so it still appears once the level is raised.
 
 ```c++
+#include <chrono>
+
 #include "duatic_message_logger/log.hpp"
 
 ...
-logging::LogThrottle no_reply_log{ std::chrono::seconds(5) };
+logging::LogThrottle no_reply_log{ std::chrono::seconds(5) };  // e.g. a member, one per message
 
 ...
-logging::warning(no_reply_log, std::chrono::steady_clock::now(), logger, "No reply from {}", name);
+logging::warning(no_reply_log, logging::LogThrottle::Clock::now(), logger, "No reply from {}", name);
+
+// in a cyclic loop, pass the cycle's time stamp instead of reading the clock per message
+logging::log(no_reply_log, cycle_start, logger, logging::LogLevel::Warning, "No reply from {}", name);
 ```
 
 A `LogOnce` lets a message through only the first time.
@@ -191,7 +241,54 @@ logging::set_level(logging::Default, *level);
 
 **Sinks**: `set_default_sink()` replaces the output, also for loggers created before the call; attached sinks stay.
 `attach_sink()` additionally forwards every record to another spdlog sink, and once `detach_sink()` returns, that sink
-receives nothing more.
+receives nothing more. Both take any spdlog sink; use the thread safe `_mt` variants, as several threads log.
+
+```c++
+#include "duatic_message_logger/log.hpp"
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+
+...
+  // Additionally write every record of the registered loggers to a file
+  auto file = std::make_shared<spdlog::sinks::basic_file_sink_mt>("/tmp/session.log");
+  file->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%n]: %v");
+  logging::attach_sink(file);
+  ...
+  logging::detach_sink(file);
+
+  // Write to a colored console instead of ROS 2 logging / stdout
+  logging::set_default_sink(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+```
+
+A custom sink, e.g. a GUI log view, derives from `spdlog::sinks::base_sink`, which serializes the calls with its
+mutex. It is called on the logging thread, so hand records over instead of blocking there:
+
+```c++
+#include <mutex>
+
+#include "duatic_message_logger/log.hpp"
+#include "spdlog/sinks/base_sink.h"
+
+class LogView : public spdlog::sinks::base_sink<std::mutex>
+{
+protected:
+  void sink_it_(const spdlog::details::log_msg& msg) override
+  {
+    const std::string_view logger(msg.logger_name.data(), msg.logger_name.size());
+    const std::string_view text(msg.payload.data(), msg.payload.size());
+    // msg.level, msg.time, ... : queue them for the view
+  }
+  void flush_() override
+  {
+  }
+};
+
+...
+  auto view = std::make_shared<LogView>();
+  logging::attach_sink(view);
+  ...
+  logging::detach_sink(view);  // before the view is destroyed
+```
 
 ## 9. ROS 2
 
