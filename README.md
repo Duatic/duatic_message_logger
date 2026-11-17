@@ -69,13 +69,16 @@ to the default sink and its level follows the level settings (see 8.).
   logging::Logger logger = logging::get_logger("my_component");
 
   // fmt style, see https://github.com/fmtlib/fmt for all formatting options
-  logging::debug(logger, "Debug {}", 1);
-  logging::info(logger, "Info {}", 1);
+  logger.debug("Debug {}", 1);
+  logger.info("Info {}", 1);
 
   // or streaming style
-  logging::warning(logger) << "Test warning";
-  logging::error(logger) << "Test error";
+  logger.warning() << "Test warning";
+  logger.error() << "Test error";
 ```
+
+The free functions take the logger as first argument and do the same, e.g. `logging::info(logger, "Info {}", 1)` or
+`logging::error(logger) << "Test error"`.
 
 ## 4. custom logger
 
@@ -92,8 +95,8 @@ logger; the level settings never touch it.
   sink->set_pattern("[%^%l%$] [%Y-%m-%d %H:%M:%S.%e] [%n]: %v");
   logging::Logger logger{ std::make_shared<spdlog::logger>("custom", sink) };
 
-  logging::info(logger, "Info {}", 1);
-  logging::fatal(logger) << "Test fatal";
+  logger.info("Info {}", 1);
+  logger.fatal() << "Test fatal";
 ```
 
 ## 5. Throttled and one time messages

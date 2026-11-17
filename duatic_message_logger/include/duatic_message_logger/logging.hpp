@@ -42,6 +42,8 @@
  *
  * - A registered logger is obtained with get_logger(name), or is the default logger. Its level comes from the level
  *   settings (set_level), never from ROS.
+ * - Log through a logger with its members, logger.info("Value {}", 1) or logger.info() << "Value " << 1, or with the
+ *   free functions, logging::info(logger, "Value {}", 1); the free functions without a logger use the default logger.
  * - A custom logger is a Logger built from your own spdlog::logger. It owns its level, which you set on that
  *   spdlog::logger; level settings never touch it.
  * - A level setting for a name applies to that name and to every name below it: "a" covers "a.b" and "a.b.c", but not
@@ -121,12 +123,16 @@ constexpr spdlog::level::level_enum to_spdlog(const LogLevel level) noexcept
 
 spdlog::logger& spdlog_logger(const Logger& logger) noexcept;
 
+class LogStream;
+
 }  // namespace impl
 
 /**
  * @brief Handle to a logger; copies refer to the same logger.
  *
  * Obtain registered loggers with get_logger(), or wrap your own spdlog::logger to get a custom logger.
+ * Log through it with logger.info("Value {}", 1) or logger.info() << "Value " << 1, or with the free functions such
+ * as logging::info(logger, "Value {}", 1).
  */
 class Logger
 {
@@ -152,6 +158,28 @@ public:
   {
     return logger_->should_log(impl::to_spdlog(level));
   }
+
+  // fmt style api; formats only when the record passes the logger's level
+  template <typename... Args>
+  void log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args) const;
+  template <typename... Args>
+  void debug(fmt::format_string<Args...> fmt, Args&&... args) const;
+  template <typename... Args>
+  void info(fmt::format_string<Args...> fmt, Args&&... args) const;
+  template <typename... Args>
+  void warning(fmt::format_string<Args...> fmt, Args&&... args) const;
+  template <typename... Args>
+  void error(fmt::format_string<Args...> fmt, Args&&... args) const;
+  template <typename... Args>
+  void fatal(fmt::format_string<Args...> fmt, Args&&... args) const;
+
+  // stream style api; does nothing below the logger's level
+  impl::LogStream log(LogLevel level) const;
+  impl::LogStream debug() const;
+  impl::LogStream info() const;
+  impl::LogStream warning() const;
+  impl::LogStream error() const;
+  impl::LogStream fatal() const;
 
 private:
   friend spdlog::logger& impl::spdlog_logger(const Logger& logger) noexcept;
@@ -278,11 +306,67 @@ private:
 
 }  // namespace impl
 
+template <typename... Args>
+inline void Logger::log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args) const
+{
+  logger_->log(impl::to_spdlog(level), fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void Logger::debug(fmt::format_string<Args...> fmt, Args&&... args) const
+{
+  log(LogLevel::Debug, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void Logger::info(fmt::format_string<Args...> fmt, Args&&... args) const
+{
+  log(LogLevel::Info, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void Logger::warning(fmt::format_string<Args...> fmt, Args&&... args) const
+{
+  log(LogLevel::Warning, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void Logger::error(fmt::format_string<Args...> fmt, Args&&... args) const
+{
+  log(LogLevel::Error, fmt, std::forward<Args>(args)...);
+}
+template <typename... Args>
+inline void Logger::fatal(fmt::format_string<Args...> fmt, Args&&... args) const
+{
+  log(LogLevel::Fatal, fmt, std::forward<Args>(args)...);
+}
+
+inline impl::LogStream Logger::log(LogLevel level) const
+{
+  return impl::LogStream(*this, level);
+}
+inline impl::LogStream Logger::debug() const
+{
+  return log(LogLevel::Debug);
+}
+inline impl::LogStream Logger::info() const
+{
+  return log(LogLevel::Info);
+}
+inline impl::LogStream Logger::warning() const
+{
+  return log(LogLevel::Warning);
+}
+inline impl::LogStream Logger::error() const
+{
+  return log(LogLevel::Error);
+}
+inline impl::LogStream Logger::fatal() const
+{
+  return log(LogLevel::Fatal);
+}
+
 // fmt style api
 template <typename... Args>
 inline void log(const Logger& logger, LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
 {
-  impl::spdlog_logger(logger).log(impl::to_spdlog(level), fmt, std::forward<Args>(args)...);
+  logger.log(level, fmt, std::forward<Args>(args)...);
 }
 template <typename... Args>
 inline void log(LogLevel level, fmt::format_string<Args...> fmt, Args&&... args)
@@ -428,7 +512,7 @@ inline impl::LogStream log(LogLevel level)
 }
 inline impl::LogStream log(const Logger& logger, LogLevel level)
 {
-  return impl::LogStream(logger, level);
+  return logger.log(level);
 }
 inline impl::LogStream debug()
 {

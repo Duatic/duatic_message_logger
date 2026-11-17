@@ -9,6 +9,7 @@ Forthcoming
   get_effective_level by name (hierarchical, as in ROS 2) or for logging::Default; ROS levels no longer filter them
 * feat!: records go straight to the ROS 2 logging output, so records ROS used to filter by level now reach its
   console and log file too
+* feat: Logger has member log calls, fmt and stream style (logger.info("..."), logger.warning() << ...)
 * feat: attach_sink / detach_sink forward records to additional sinks; set_default_sink replaces only the output
 * feat: log_levels lists all levels and to_string(LogLevel) gives the names parse_level_from_string accepts
 * feat: parse_level_from_string accepts "warn"

@@ -353,6 +353,43 @@ TEST(Logging, DisabledStreamDoesNotFormat)
   EXPECT_EQ(calls, 1);
 }
 
+TEST(Logging, MemberCallsLogThroughTheLogger)
+{
+  std::ostringstream out;
+  auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(out);
+  sink->set_pattern("%v");
+  const logging::Logger logger{ std::make_shared<spdlog::logger>("members", sink) };
+
+  logger.info("a {}", 1);
+  logger.warning() << "b " << 2;
+  logger.log(logging::LogLevel::Error, "c");
+  EXPECT_EQ(out.str(), "a 1\nb 2\nc\n");
+}
+
+TEST(Logging, DisabledMemberStreamDoesNotFormat)
+{
+  const auto logger = logging::get_logger("member_stream_disabled");
+  int calls = 0;
+  logger.debug() << Counted{ &calls };
+  EXPECT_EQ(calls, 0);
+  logger.info() << Counted{ &calls };
+  EXPECT_EQ(calls, 1);
+}
+
+TEST(Logging, MemberCallsFollowLevelSettings)
+{
+  const auto logger = logging::get_logger("member_levels");
+  const Capture capture;
+  logger.debug("hidden");
+  EXPECT_FALSE(capture.contains("hidden")) << capture.str();
+
+  logging::set_level("member_levels", logging::LogLevel::Debug);
+  logger.debug("shown {}", 1);
+  EXPECT_TRUE(capture.contains("member_levels debug: shown 1")) << capture.str();
+
+  logging::reset_level("member_levels");
+}
+
 TEST(Logging, ParseLevelAcceptsPrintedNamesAndWarn)
 {
   EXPECT_EQ(logging::parse_level_from_string("debug"), logging::LogLevel::Debug);
