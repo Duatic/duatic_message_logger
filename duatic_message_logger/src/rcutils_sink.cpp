@@ -93,6 +93,13 @@ RcutilsSink::RcutilsSink() : stdout_(std::make_shared<spdlog::sinks::stdout_colo
 {
 }
 
+const std::shared_ptr<RcutilsSink>& default_output()
+{
+  static const std::shared_ptr<RcutilsSink>& sink{ *new std::shared_ptr<RcutilsSink>{
+      std::make_shared<RcutilsSink>() } };
+  return sink;
+}
+
 void RcutilsSink::set_ros_logger(std::string ros_logger)
 {
   const std::lock_guard lock(mutex_);

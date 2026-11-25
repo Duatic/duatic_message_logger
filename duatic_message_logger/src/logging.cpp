@@ -35,7 +35,6 @@
 #include "spdlog/sinks/sink.h"
 
 #include "duatic_message_logger/detail/rcutils_sink.hpp"
-#include "duatic_message_logger/ros.hpp"
 
 namespace duatic::message_logger
 {
@@ -74,8 +73,7 @@ namespace
 struct Sinks
 {
   std::mutex mutex;
-  const std::shared_ptr<detail::RcutilsSink> ros_output{ std::make_shared<detail::RcutilsSink>() };
-  spdlog::sink_ptr output{ ros_output };
+  spdlog::sink_ptr output{ detail::default_output() };
   std::vector<spdlog::sink_ptr> attached;
   std::shared_ptr<spdlog::sinks::dist_sink_mt> forwarding{ std::make_shared<spdlog::sinks::dist_sink_mt>(
       std::vector<spdlog::sink_ptr>{ output }) };
@@ -338,13 +336,5 @@ void detach_sink(const spdlog::sink_ptr& sink)
   state.attached.erase(it);
   state.rebuild();
 }
-
-namespace ros
-{
-void set_node_logger(const std::string& name)
-{
-  sinks().ros_output->set_ros_logger(name);
-}
-}  // namespace ros
 
 }  // namespace duatic::message_logger

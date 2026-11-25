@@ -82,4 +82,7 @@ private:
   std::string ros_logger_;  ///< Guarded by mutex_
 };
 
+/// @brief The output the registered loggers start with; created on first use and never destroyed
+const std::shared_ptr<RcutilsSink>& default_output();
+
 }  // namespace duatic::message_logger::detail
