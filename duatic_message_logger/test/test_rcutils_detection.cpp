@@ -32,6 +32,7 @@
 #include <rcutils/logging.h>  // NOLINT(build/include_order)
 
 #include "duatic_message_logger/logging.hpp"
+#include "duatic_message_logger/ros.hpp"
 
 namespace
 {
@@ -106,13 +107,13 @@ TEST_F(RcutilsDetection, RosLoggerCarriesTheRecords)
 {
   auto logger = duatic::message_logger::get_logger("component.part");
 
-  duatic::message_logger::set_ros_logger("robot.some_node");
+  duatic::message_logger::ros::set_node_logger("robot.some_node");
   duatic::message_logger::warning(logger, "hello {}", 1);
   ASSERT_FALSE(records.empty());
   EXPECT_EQ(records.back().text, "robot.some_node: [component.part] hello 1");
   EXPECT_EQ(records.back().severity, RCUTILS_LOG_SEVERITY_WARN);
 
-  duatic::message_logger::set_ros_logger("");
+  duatic::message_logger::ros::set_node_logger("");
   duatic::message_logger::info(logger, "own name");
   EXPECT_EQ(records.back().text, "component.part: own name");
 }

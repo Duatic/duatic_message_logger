@@ -21,7 +21,7 @@ Forthcoming
 * feat: the DUATIC_LOG_LEVEL environment variable sets the Default level until set_level(Default, ...) is called
 * feat: LogThrottle and LogOnce let repeated messages through once per period or only once (#20); a message below
   the logger's level does not use up their slot
-* feat: set_ros_logger writes the records under a node's logger, so they reach /rosout
+* feat: ros::set_node_logger (ros.hpp) writes the records under a node's logger, so they reach /rosout
 * feat: attach_sink / detach_sink forward records to additional sinks; set_output_sink replaces only the output
 * feat: log_levels lists all levels, to_string(LogLevel) gives their names, and parse_level accepts these names and
   "warn"

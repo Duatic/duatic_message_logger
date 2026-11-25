@@ -308,12 +308,16 @@ installs do not need it.
 ROS only handles its own loggers: ROS levels and `--ros-args --log-level` do not affect duatic loggers, and our level
 settings do not change ROS's; use `set_level` (e.g. from a node parameter).
 
-The records reach `/rosout` only under the name of a node's logger, as rcl publishes only those. `set_ros_logger` writes
-all records under one such name, with each record's own logger name in front of its message:
+The records reach `/rosout` only under the name of a node's logger, as rcl publishes only those.
+`ros::set_node_logger`, from its own header, writes all records under one such name, with each record's own logger name
+in front of its message:
 
 ```c++
+#include "duatic_message_logger/ros.hpp"
+
+...
 auto node = std::make_shared<rclcpp::Node>("driver");
-logging::set_ros_logger(node->get_logger().get_name());
+logging::ros::set_node_logger(node->get_logger().get_name());
 logging::get_logger("duatic.duadrive").warning("Overcurrent");  // /rosout: [driver]: [duatic.duadrive] Overcurrent
 ```
 
