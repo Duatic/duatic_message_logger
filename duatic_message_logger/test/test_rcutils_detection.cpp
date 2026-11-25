@@ -101,6 +101,22 @@ TEST_F(RcutilsDetection, RosLevelsDoNotFilterOurLoggers)
   duatic::message_logger::reset_level("ros_filtered");
 }
 
+// rcl publishes to /rosout only under a node's logger name, so the records can be written under one
+TEST_F(RcutilsDetection, RosLoggerCarriesTheRecords)
+{
+  auto logger = duatic::message_logger::get_logger("component.part");
+
+  duatic::message_logger::set_ros_logger("robot.some_node");
+  duatic::message_logger::warning(logger, "hello {}", 1);
+  ASSERT_FALSE(records.empty());
+  EXPECT_EQ(records.back().text, "robot.some_node: [component.part] hello 1");
+  EXPECT_EQ(records.back().severity, RCUTILS_LOG_SEVERITY_WARN);
+
+  duatic::message_logger::set_ros_logger("");
+  duatic::message_logger::info(logger, "own name");
+  EXPECT_EQ(records.back().text, "component.part: own name");
+}
+
 // A record logged after rcutils logging was shut down is still printed, not rejected by the console handler
 TEST_F(RcutilsDetection, RecordAfterShutdownInitializesAgain)
 {

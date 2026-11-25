@@ -93,6 +93,12 @@ RcutilsSink::RcutilsSink() : stdout_(std::make_shared<spdlog::sinks::stdout_colo
 {
 }
 
+void RcutilsSink::set_ros_logger(std::string ros_logger)
+{
+  const std::lock_guard lock(mutex_);
+  ros_logger_ = std::move(ros_logger);
+}
+
 void RcutilsSink::resolve()
 {
   auto* get_handler = reinterpret_cast<RcutilsGetOutputHandler>(find_symbol("rcutils_logging_get_output_handler"));
@@ -120,14 +126,22 @@ void RcutilsSink::sink_it_(const spdlog::details::log_msg& msg)
     return;
   }
   // The logger's level already decided, so this skips the level check rcutils_log would do
-  const std::string name(msg.logger_name.begin(), msg.logger_name.end());
+  std::string name(msg.logger_name.begin(), msg.logger_name.end());
+  std::string_view text(msg.payload.data(), msg.payload.size());
+  std::string prefixed;
+  if (!ros_logger_.empty()) {
+    prefixed = "[" + name + "] ";
+    prefixed.append(text);
+    text = prefixed;
+    name = ros_logger_;
+  }
   const rcutils_log_location_t location{ msg.source.funcname != nullptr ? msg.source.funcname : "",
                                          msg.source.filename != nullptr ? msg.source.filename : "",
                                          static_cast<std::size_t>(msg.source.line > 0 ? msg.source.line : 0) };
   const auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(msg.time.time_since_epoch()).count();
   call_output_handler(handler, &location, to_ros_severity(msg.level), name.c_str(),
-                      static_cast<rcutils_time_point_value_t>(timestamp), "%.*s", static_cast<int>(msg.payload.size()),
-                      msg.payload.data());
+                      static_cast<rcutils_time_point_value_t>(timestamp), "%.*s", static_cast<int>(text.size()),
+                      text.data());
 }
 
 void RcutilsSink::flush_()

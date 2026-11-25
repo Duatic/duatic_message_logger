@@ -73,7 +73,8 @@ namespace
 struct Sinks
 {
   std::mutex mutex;
-  spdlog::sink_ptr output{ std::make_shared<detail::RcutilsSink>() };
+  const std::shared_ptr<detail::RcutilsSink> ros_output{ std::make_shared<detail::RcutilsSink>() };
+  spdlog::sink_ptr output{ ros_output };
   std::vector<spdlog::sink_ptr> attached;
   std::shared_ptr<spdlog::sinks::dist_sink_mt> forwarding{ std::make_shared<spdlog::sinks::dist_sink_mt>(
       std::vector<spdlog::sink_ptr>{ output }) };
@@ -313,6 +314,10 @@ void set_output_sink(spdlog::sink_ptr sink)
   const std::lock_guard lock(state.mutex);
   state.output = std::move(sink);
   state.rebuild();
+}
+void set_ros_logger(const std::string& name)
+{
+  sinks().ros_output->set_ros_logger(name);
 }
 void attach_sink(spdlog::sink_ptr sink)
 {

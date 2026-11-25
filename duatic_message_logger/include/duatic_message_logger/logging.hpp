@@ -650,6 +650,15 @@ void reset_level(DefaultLevelTag);
 void set_output_sink(spdlog::sink_ptr sink);
 
 /**
+ * @brief Writes the records to ROS 2 logging under the ROS logger @p name, so they also reach /rosout.
+ * rcl publishes to /rosout only for the loggers of a node, so pass a node's logger name, e.g.
+ * node->get_logger().get_name(). Each record keeps its own logger name in front of its message.
+ * @note An empty name writes the records under their own names again. Has no effect while set_output_sink() has
+ * replaced the default output.
+ */
+void set_ros_logger(const std::string& name);
+
+/**
  * @brief Also forwards every record of the registered loggers to @p sink.
  * @note Applies to loggers created before the call as well. Attaching an attached sink again has no effect; attaching
  * the output delivers its records twice.
