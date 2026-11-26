@@ -31,6 +31,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <rcutils/logging.h>  // NOLINT(build/include_order)
@@ -57,6 +58,10 @@ class RcutilsSink : public spdlog::sinks::base_sink<std::mutex>
 public:
   RcutilsSink();
 
+  /// @brief Writes the records under the ROS logger @p ros_logger, each with its own logger name in front of the
+  /// message; an empty name writes them under their own names
+  void set_ros_logger(std::string ros_logger);
+
 protected:
   void sink_it_(const spdlog::details::log_msg& msg) override;
   void flush_() override;
@@ -74,6 +79,10 @@ private:
   // Looked up per record, as rcl installs its output handler at initialization, possibly after the lookup
   RcutilsGetOutputHandler get_output_handler_{ nullptr };
   bool resolved_{ false };  ///< Whether the lookup happened
+  std::string ros_logger_;  ///< Guarded by mutex_
 };
+
+/// @brief The output the registered loggers start with; created on first use and never destroyed
+const std::shared_ptr<RcutilsSink>& default_output();
 
 }  // namespace duatic::message_logger::detail

@@ -73,7 +73,7 @@ namespace
 struct Sinks
 {
   std::mutex mutex;
-  spdlog::sink_ptr output{ std::make_shared<detail::RcutilsSink>() };
+  spdlog::sink_ptr output{ detail::default_output() };
   std::vector<spdlog::sink_ptr> attached;
   std::shared_ptr<spdlog::sinks::dist_sink_mt> forwarding{ std::make_shared<spdlog::sinks::dist_sink_mt>(
       std::vector<spdlog::sink_ptr>{ output }) };

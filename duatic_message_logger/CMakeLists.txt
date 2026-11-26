@@ -14,7 +14,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11_vendor REQUIRED)
 find_package(pybind11 REQUIRED)
 
-add_library(duatic_message_logger src/logging.cpp src/rcutils_sink.cpp)
+add_library(duatic_message_logger src/logging.cpp src/rcutils_sink.cpp src/ros.cpp)
 add_library(duatic_message_logger::duatic_message_logger ALIAS duatic_message_logger)
 target_compile_features(duatic_message_logger PUBLIC c_std_99 cxx_std_20)  # Require C99 and C++20
 target_include_directories(duatic_message_logger PUBLIC
