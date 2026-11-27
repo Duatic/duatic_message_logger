@@ -2,8 +2,8 @@
 Changelog for package duatic_message_logger
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+Upcoming changes
+----------------
 * feat!: Logger is a handle onto a logger instead of an spdlog::logger; get_logger(name) returns the registered logger
   of that name, and copies share it; custom loggers are wrapped as Logger{ std::make_shared<spdlog::logger>(...) }
 * feat!: Logger has its own member log calls under our level names, fmt and stream style (logger.info("..."),
