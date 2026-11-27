@@ -2,8 +2,8 @@
 Changelog for package message_logger
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+Upcoming changes
+----------------
 * fix: MELO_FATAL, MELO_FATAL_STREAM and MELO_FATAL_THROTTLE_STREAM log at fatal instead of error
 
 1.0.0 (2026-11-05)
