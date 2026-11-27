@@ -41,10 +41,6 @@ Changelog for package duatic_message_logger
   the logging path; a process that loads ROS 2 only after its first record keeps writing to stdout
 * doc: sinks run on the logging thread while the sinks are locked; they must not log and should
   queue slow work
-* feat(api)!: Rework the whole logger api (#23)
-* feat: ros::set_node_logger writes the records under a node's logger (#26)
-* feat(sinks): Allow to remove change change sinks (default sink) (#22)
-* feat: throttled and log once calls for repeated messages (#20)
 
 2.0.0 (2026-11-04)
 ------------------
